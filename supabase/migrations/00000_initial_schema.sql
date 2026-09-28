@@ -1,5 +1,5 @@
--- Enable UUID generation
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- gen_random_uuid() is built into PostgreSQL 13+ and always available on
+-- Supabase hosted.  No extension required.
 
 -- ==========================================
 -- Enums
@@ -17,7 +17,7 @@ CREATE TYPE escalation_status AS ENUM ('open', 'in_progress', 'resolved', 'close
 -- 1. Identity & Access Management
 -- ==========================================
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
     role user_role NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE users (
 -- 2. Academic Entities
 -- ==========================================
 CREATE TABLE classes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     section TEXT NOT NULL,
     full_name TEXT NOT NULL,
@@ -40,7 +40,7 @@ CREATE TABLE classes (
 );
 
 CREATE TABLE faculty (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     department TEXT NOT NULL,
     role faculty_role NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE faculty (
 );
 
 CREATE TABLE class_faculty (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     faculty_id UUID NOT NULL REFERENCES faculty(id) ON DELETE CASCADE,
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc', now()) NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE class_faculty (
 );
 
 CREATE TABLE parents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
@@ -68,7 +68,7 @@ CREATE TABLE parents (
 );
 
 CREATE TABLE students (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     parent_id UUID NOT NULL REFERENCES parents(id) ON DELETE RESTRICT,
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE RESTRICT,
     name TEXT NOT NULL,
@@ -89,7 +89,7 @@ ALTER TABLE users ADD CONSTRAINT fk_student FOREIGN KEY (student_id) REFERENCES 
 -- 3. Attendance
 -- ==========================================
 CREATE TABLE attendance_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     method TEXT NOT NULL,
@@ -101,7 +101,7 @@ CREATE TABLE attendance_sessions (
 );
 
 CREATE TABLE attendance_records (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES attendance_sessions(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     status student_status NOT NULL,
@@ -114,7 +114,7 @@ CREATE TABLE attendance_records (
 -- 4. QR Tracking
 -- ==========================================
 CREATE TABLE qr_sessions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     class_id UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -124,7 +124,7 @@ CREATE TABLE qr_sessions (
 );
 
 CREATE TABLE qr_check_ins (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id UUID NOT NULL REFERENCES qr_sessions(id) ON DELETE CASCADE,
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT timezone('utc', now()),
@@ -137,7 +137,7 @@ CREATE TABLE qr_check_ins (
 -- 5. Audits
 -- ==========================================
 CREATE TABLE audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     actor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     action TEXT NOT NULL,
     target TEXT NOT NULL,

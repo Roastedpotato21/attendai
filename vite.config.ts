@@ -22,6 +22,12 @@ function getLocalIp() {
 process.env["VITE_LOCAL_IP"] = getLocalIp();
 
 export default defineConfig({
+  // The Lovable wrapper intentionally exposes a narrow Nitro option type,
+  // while Nitro itself supports explicit runtime plugins. Registering this
+  // plugin wires Cloudflare's native scheduled event into the existing app.
+  nitro: {
+    plugins: ["./server/plugins/communication-scheduler.ts"],
+  } as unknown as { preset?: string },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this

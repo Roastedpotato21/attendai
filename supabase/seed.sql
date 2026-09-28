@@ -55,14 +55,16 @@ ON CONFLICT (id) DO UPDATE SET
   academic_year = EXCLUDED.academic_year, active = EXCLUDED.active,
   updated_at = timezone('utc', now());
 
-INSERT INTO public.parents (id, institution_id, name, phone, email, language, preferred_channel, active) VALUES
-  ('30000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Lakshmi Reddy', '+91 98765 01001', 'lakshmi@northstar.attendai.test', 'te', 'sms', true),
-  ('30000000-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'Srinivas Kumar', '+91 98765 01002', 'srinivas@northstar.attendai.test', 'en', 'whatsapp', true),
-  ('31000000-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222', 'Maya Shah', '+91 98765 02001', 'maya@riverside.attendai.test', 'hi', 'sms', true)
+INSERT INTO public.parents (id, institution_id, name, phone, email, language, preferred_channel, active, communication_consent, communication_consent_updated_at) VALUES
+  ('30000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Lakshmi Reddy', '+91 98765 01001', 'lakshmi@northstar.attendai.test', 'te', 'sms', true, true, timezone('utc', now())),
+  ('30000000-0000-4000-8000-000000000002', '11111111-1111-4111-8111-111111111111', 'Srinivas Kumar', '+91 98765 01002', 'srinivas@northstar.attendai.test', 'en', 'whatsapp', true, true, timezone('utc', now())),
+  ('31000000-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222', 'Maya Shah', '+91 98765 02001', 'maya@riverside.attendai.test', 'hi', 'sms', true, true, timezone('utc', now()))
 ON CONFLICT (id) DO UPDATE SET
   institution_id = EXCLUDED.institution_id, name = EXCLUDED.name,
   phone = EXCLUDED.phone, email = EXCLUDED.email, language = EXCLUDED.language,
   preferred_channel = EXCLUDED.preferred_channel, active = EXCLUDED.active,
+  communication_consent = EXCLUDED.communication_consent,
+  communication_consent_updated_at = EXCLUDED.communication_consent_updated_at,
   updated_at = timezone('utc', now());
 
 INSERT INTO public.students (

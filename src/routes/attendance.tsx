@@ -59,13 +59,7 @@ import type {
   QRSession,
   QRCheckIn,
 } from "@/lib/types";
-import {
-  communication,
-  studentService,
-  attendanceService,
-  qrService,
-  auditService,
-} from "@/lib/services";
+import { studentService, attendanceService, qrService, auditService } from "@/lib/services";
 import { useAuth } from "@/components/auth/auth-context";
 import { LOCAL_IP } from "@/lib/local-ip";
 
@@ -324,16 +318,10 @@ function AttendancePage() {
     }
     toast.loading("Queueing AI outreach…", { id: "notify" });
     try {
-      await communication.messaging.send({
-        to: absentees[0]!.parentPhone,
-        channel: "WhatsApp",
-        language: absentees[0]!.language,
-        templateId: "T-02",
-        variables: { student_name: absentees[0]!.name },
-      });
-      toast.success(`${absentees.length} parents queued for SMS/WhatsApp + AI voice call`, {
+      toast.success(`${absentees.length} consented parent notifications are queued`, {
         id: "notify",
-        description: "Simulation mode — no real delivery.",
+        description:
+          "Attendance submission creates durable outbox jobs; this action does not send a message.",
       });
       setSummary(null);
     } catch (error) {

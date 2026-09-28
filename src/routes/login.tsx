@@ -1,19 +1,12 @@
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { LogIn } from "lucide-react";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/components/auth/auth-context";
-import { hasDatabaseConnection } from "@/lib/db/connection";
 
 /**
  * Sanitize a post-login redirect to prevent open-redirect attacks.
@@ -48,14 +41,14 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 function LoginPage() {
-  const { loginWithPassword } = useAuth();
-  const navigate = useNavigate();
+  const { loginWithPassword, sendPasswordReset } = useAuth();
   const router = useRouter();
   const [isLoggingIn, setIsLoggingIn] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
   const { redirect } = Route.useSearch();
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -64,21 +57,34 @@ function LoginPage() {
     setError(null);
 
     try {
-      const user = await loginWithPassword(email, password);
+      await loginWithPassword(email, password);
 
-      // Determine where to send the user after login
-      const safeRedirect = sanitizeRedirect(redirect);
-      if (safeRedirect) {
-        await router.navigate({ href: safeRedirect });
-      } else if (user?.role === "student") {
-        await router.navigate({ to: "/student-dashboard" });
-      } else {
-        await router.navigate({ to: "/" });
-      }
+      // Validate but intentionally ignore deep links: staff always enter via the dashboard.
+      void sanitizeRedirect(redirect);
+      await router.navigate({ to: "/" });
     } catch (loginError: unknown) {
       setError(loginError instanceof Error ? loginError.message : "Failed to log in.");
     } finally {
       setIsLoggingIn(null);
+    }
+  };
+
+  const requestPasswordReset = async () => {
+    if (!email.trim()) {
+      setError("Enter your email address first.");
+      return;
+    }
+    setError(null);
+    setResetMessage(null);
+    try {
+      await sendPasswordReset(email);
+      setResetMessage("If this email belongs to a staff account, a reset link has been sent.");
+    } catch (resetError) {
+      setError(
+        resetError instanceof Error
+          ? resetError.message
+          : "Password recovery is temporarily unavailable.",
+      );
     }
   };
 
@@ -89,12 +95,8 @@ function LoginPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
             <LogIn className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl font-display">Welcome to AttendAI</CardTitle>
-          <CardDescription>
-            {hasDatabaseConnection()
-              ? "Sign in to your account"
-              : "Sign in or select a mock account"}
-          </CardDescription>
+          <CardTitle className="text-2xl font-display">AttendAI</CardTitle>
+          <CardDescription>Sign in to your staff account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handlePasswordLogin} className="space-y-4">
@@ -107,7 +109,10 @@ function LoginPage() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
+                autoCapitalize="none"
                 placeholder="name@attendai.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -118,7 +123,9 @@ function LoginPage() {
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -127,7 +134,27 @@ function LoginPage() {
             <Button type="submit" className="w-full mt-4" disabled={!!isLoggingIn}>
               {isLoggingIn === "password" ? "Signing in..." : "Sign in"}
             </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="w-full"
+              onClick={() => void requestPasswordReset()}
+            >
+              Forgot password?
+            </Button>
+            {resetMessage && (
+              <p className="text-center text-sm text-muted-foreground">{resetMessage}</p>
+            )}
           </form>
+          <div className="border-t pt-4 text-center text-sm text-muted-foreground">
+            <p>New institution?</p>
+            <Link
+              to="/create-account"
+              className="mt-1 inline-block font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Create an administrator account
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

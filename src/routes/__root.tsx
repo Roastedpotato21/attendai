@@ -41,15 +41,18 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const configurationError = /VITE_SUPABASE_URL|VITE_SUPABASE_ANON_KEY/.test(error.message);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          {configurationError ? "Supabase configuration is incomplete" : "This page didn't load"}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          {configurationError
+            ? "Set the browser-safe VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY values, then reload."
+            : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -158,19 +161,17 @@ function AuthWrapper() {
 
     if (!user && !isPublicRoute) {
       // Unauthenticated → redirect to login
-      router.navigate({ to: "/login", search: { redirect: pathname } });
+      void router.navigate({
+        to: "/login",
+        search: { redirect: pathname },
+        replace: true,
+      });
     } else if (user && pathname === "/login") {
       // Authenticated but on login page → redirect to home
-      router.navigate({ to: "/" });
-    } else if (
-      user?.role === "student" &&
-      !["/check-in", "/student-dashboard"].includes(pathname)
-    ) {
-      // Students can only access student-specific routes
-      router.navigate({ to: "/student-dashboard" });
+      void router.navigate({ to: "/", replace: true });
     } else if (user && !isRouteAllowed(pathname, user.role)) {
       // Role not allowed for this route → redirect to home
-      router.navigate({ to: "/" });
+      void router.navigate({ to: "/", replace: true });
     }
   }, [user, isLoading, pathname, isPublicRoute, router]);
 
@@ -209,4 +210,3 @@ function AuthWrapper() {
     </AppShell>
   );
 }
-

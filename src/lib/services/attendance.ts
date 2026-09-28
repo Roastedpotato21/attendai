@@ -15,7 +15,6 @@ import type {
 } from "@/lib/types";
 import type { DbAttendanceRecord, DbAttendanceSession } from "../db/schema";
 import { attendanceRepository, classRepository } from "../db/repositories";
-import { communicationEngine } from "./communication-engine";
 import { NotFoundError, ValidationError } from "../db/errors";
 
 export interface AttendanceService {
@@ -138,14 +137,10 @@ export const attendanceService: AttendanceService = {
       })),
     );
 
-    // Trigger parent communications for absences
-    const absentStudentIds = submission.records
-      .filter((r) => r.status === "absent")
-      .map((r) => r.studentId);
-
-    if (absentStudentIds.length > 0) {
-      communicationEngine.triggerAbsenceNotifications(session.id, absentStudentIds);
-    }
+    // Phase 3B intentionally does not dispatch providers from this application
+    // process. In Supabase mode, migration 00007 atomically creates consented
+    // parent communication jobs with the attendance record. A server-side
+    // worker claims those jobs later. Mock mode never attempts provider calls.
 
     return {
       success: true,

@@ -196,7 +196,7 @@ CREATE INDEX IF NOT EXISTS idx_communications_scheduled
   WHERE scheduled_for IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.interventions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   risk_level risk_level NOT NULL,
   reason TEXT NOT NULL,
@@ -224,7 +224,7 @@ CREATE INDEX IF NOT EXISTS idx_interventions_owner_status
   WHERE owner_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS public.escalations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
   class_id UUID NOT NULL REFERENCES public.classes(id) ON DELETE RESTRICT,
   intervention_id UUID REFERENCES public.interventions(id) ON DELETE SET NULL,

@@ -34,7 +34,8 @@ export async function withRetry<T>(operation: string, fn: () => Promise<T>): Pro
       lastError = err;
 
       // Only retry transient connection errors
-      const isRetryable = err instanceof ConnectionError || (err instanceof DatabaseError && err.isRetryable);
+      const isRetryable =
+        err instanceof ConnectionError || (err instanceof DatabaseError && err.isRetryable);
 
       if (!isRetryable || attempt === MAX_RETRIES) {
         throw err;

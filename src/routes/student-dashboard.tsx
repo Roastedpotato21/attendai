@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { CalendarCheck, UserCheck, UserX, Clock, AlertTriangle } from "lucide-react";
 
@@ -9,12 +9,6 @@ import { attendanceService } from "@/lib/services";
 import { useAuth } from "@/components/auth/auth-context";
 
 export const Route = createFileRoute("/student-dashboard")({
-  beforeLoad: ({ context, location }) => {
-    // Only students should really be here, but we can allow testing
-    if (!context.auth.user) {
-      throw redirect({ to: "/login", search: { redirect: location.href } });
-    }
-  },
   component: StudentDashboard,
 });
 

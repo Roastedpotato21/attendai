@@ -54,10 +54,10 @@ export const auditRepository = {
       if (error) {
         // Audit insert failures should be logged but not necessarily fatal.
         // If RLS denies the insert, we warn instead of crashing the parent operation.
-        console.error(
-          `[Audit] Failed to write audit log (${error.code}): ${error.message}`,
-          { action: log.action, target: log.target },
-        );
+        console.error(`[Audit] Failed to write audit log (${error.code}): ${error.message}`, {
+          action: log.action,
+          target: log.target,
+        });
         throw fromSupabaseError("audit log create", error);
       }
       if (!data) throw fromSupabaseError("audit log create");

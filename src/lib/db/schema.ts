@@ -30,7 +30,10 @@ export interface TenantEntity extends BaseEntity {
 // ---------------------------------------------------------------------------
 
 /** Fields managed by the database — excluded from insert payloads. */
-export type DbInsert<T extends TenantEntity> = Omit<T, "id" | "institutionId" | "createdAt" | "updatedAt">;
+export type DbInsert<T extends TenantEntity> = Omit<
+  T,
+  "id" | "institutionId" | "createdAt" | "updatedAt"
+>;
 
 /** Partial update payload — id and audit fields are never updatable. */
 export type DbUpdate<T extends BaseEntity> = Partial<Omit<T, "id" | "createdAt" | "updatedAt">>;

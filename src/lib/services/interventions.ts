@@ -1,7 +1,6 @@
 import type { Intervention, InterventionStatus, RiskLevel } from "@/lib/types";
 import { interventionRepository, studentRepository } from "../db/repositories";
 import { analyticsService } from "./analytics";
-import { communicationEngine } from "./communication-engine";
 
 type InterventionWithClassId = Intervention & { classId?: string };
 
@@ -103,13 +102,11 @@ export const mockInterventionService: InterventionService = {
 
         createdCount++;
 
-        // Trigger parent outreach for high-risk
+        // Phase 3B does not dispatch providers from this UI process. Absence
+        // alerts are enqueued atomically by the database outbox trigger;
+        // intervention outreach remains an explicit operational workflow.
         if (riskProfile.riskLevel === "high") {
-          communicationEngine.triggerInterventionOutreach(
-            riskProfile.studentId,
-            riskProfile.riskLevel,
-          );
-          notifiedCount++;
+          notifiedCount += 0;
         }
       }
     }

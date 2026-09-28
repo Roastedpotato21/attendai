@@ -134,7 +134,11 @@ export const attendanceRepository = {
             totalLate: records.filter((r) => r.status === "late").length,
           });
           const recs = await this.createRecords(
-            records.map((r) => ({ sessionId: session.id, studentId: r.studentId, status: r.status })),
+            records.map((r) => ({
+              sessionId: session.id,
+              studentId: r.studentId,
+              status: r.status,
+            })),
           );
           return { session, records: recs };
         }

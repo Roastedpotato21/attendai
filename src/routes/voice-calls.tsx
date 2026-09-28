@@ -24,12 +24,13 @@ export const Route = createFileRoute("/voice-calls")({
       {
         name: "description",
         content:
-          "Multilingual AI voice calls to parents in English, Telugu and Hindi with retries, parent responses and AI summaries.",
+          "Voice-call history and simulation records. Conversational parent calls require a separately provisioned speech runtime.",
       },
       { property: "og:title", content: "AI Voice Calls — AttendAI" },
       {
         property: "og:description",
-        content: "Call status, retries, parent responses and AI summaries.",
+        content:
+          "Call status and simulation history; conversational voice is not enabled in this deployment.",
       },
     ],
   }),
@@ -72,7 +73,7 @@ function VoiceCallsPage() {
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title="AI Voice Calls"
-        description="Automated multilingual calls that understand what parents say and summarise it for faculty."
+        description="Simulation history. Conversational multilingual voice is disabled until a speech-to-text and constrained AI runtime is provisioned."
         actions={
           <Button
             onClick={() =>

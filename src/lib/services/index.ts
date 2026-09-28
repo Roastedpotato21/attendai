@@ -17,17 +17,12 @@ export * from "./misc";
 export * from "./audit";
 export * from "./escalations";
 export * from "./communication";
-export * from "./communication-engine";
 export * from "./messages";
 export * from "./voice-calls";
 export * from "./templates";
-export * from "./sms";
 
 export { communication } from "./communication";
 export type { SendMessageInput, PlaceCallInput, ProviderResult } from "./communication";
-
-export { smsService } from "./sms";
-export type { SmsInput, SmsResult } from "./sms";
 
 export { studentService } from "./students";
 export type { StudentService } from "./students";

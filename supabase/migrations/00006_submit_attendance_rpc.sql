@@ -12,6 +12,13 @@
 -- - Atomic transaction (all writes roll back together on error)
 -- - Explicit, bounded parameters with safe search_path
 
+ALTER TABLE public.attendance_sessions
+  DROP CONSTRAINT IF EXISTS attendance_sessions_method_check;
+
+ALTER TABLE public.attendance_sessions
+  ADD CONSTRAINT attendance_sessions_method_check
+  CHECK (method IN ('manual', 'qr', 'face', 'faculty', 'ai'));
+
 CREATE OR REPLACE FUNCTION public.submit_attendance(
   p_class_id UUID,
   p_date DATE,
@@ -44,8 +51,8 @@ BEGIN
   END IF;
 
   -- 2. Validate input method
-  IF p_method NOT IN ('manual', 'qr', 'face') THEN
-    RAISE EXCEPTION 'invalid attendance method: %, must be manual, qr, or face', p_method
+  IF p_method NOT IN ('manual', 'qr', 'face', 'faculty', 'ai') THEN
+    RAISE EXCEPTION 'invalid attendance method: %, must be manual, qr, face, faculty, or ai', p_method
       USING ERRCODE = '22023';
   END IF;
 

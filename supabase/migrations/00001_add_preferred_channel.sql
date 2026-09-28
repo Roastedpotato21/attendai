@@ -6,7 +6,7 @@ ADD COLUMN preferred_channel channel_type NOT NULL DEFAULT 'sms';
 
 -- Create communications table
 CREATE TABLE communications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
     parent_id UUID NOT NULL REFERENCES parents(id) ON DELETE CASCADE,
     type channel_type NOT NULL,

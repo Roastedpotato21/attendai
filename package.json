@@ -8,6 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "node --env-file-if-exists=.env scripts/preview.mjs",
+    "test:communications": "node --test scripts/test-communications.mjs",
+    "test:auth-errors": "node --experimental-strip-types --test scripts/test-auth-errors.mjs",
+    "test:auth-browser": "node scripts/test-auth-browser.mjs",
+    "test:postgres": "node scripts/verify-postgres.cjs",
+    "bootstrap:admin": "node --env-file-if-exists=.env scripts/bootstrap-admin.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

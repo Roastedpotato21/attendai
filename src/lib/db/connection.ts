@@ -73,11 +73,7 @@ const dataModeRaw = readEnv("VITE_DATA_MODE");
  */
 function resolveDataMode(): DataMode {
   if (dataModeRaw === "mock") return "mock";
-  if (dataModeRaw === "supabase") return "supabase";
-
-  // Implicit detection
-  if (supabaseUrl || supabaseKey) return "supabase";
-  return "mock";
+  return "supabase";
 }
 
 const resolvedMode = resolveDataMode();
@@ -109,7 +105,8 @@ export const supabase: SupabaseClient | null =
     : null;
 
 /** Returns true when the app should use Supabase for persistence. */
-export const hasDatabaseConnection = (): boolean => resolvedMode === "supabase" && supabase !== null;
+export const hasDatabaseConnection = (): boolean =>
+  resolvedMode === "supabase" && supabase !== null;
 
 /**
  * Returns the Supabase client or throws.

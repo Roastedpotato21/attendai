@@ -10,10 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as AuditLogsRouteImport } from './routes/audit-logs'
 import { Route as CheckInRouteImport } from './routes/check-in'
+import { Route as CreateAccountRouteImport } from './routes/create-account'
 import { Route as EscalationsRouteImport } from './routes/escalations'
 import { Route as FacultyRouteImport } from './routes/faculty'
 import { Route as InsightsRouteImport } from './routes/insights'
@@ -34,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AcceptInviteRoute = AcceptInviteRouteImport.update({
+  id: '/accept-invite',
+  path: '/accept-invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AnalyticsRoute = AnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -52,6 +59,11 @@ const AuditLogsRoute = AuditLogsRouteImport.update({
 const CheckInRoute = CheckInRouteImport.update({
   id: '/check-in',
   path: '/check-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateAccountRoute = CreateAccountRouteImport.update({
+  id: '/create-account',
+  path: '/create-account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EscalationsRoute = EscalationsRouteImport.update({
@@ -127,10 +139,12 @@ const VoiceCallsRoute = VoiceCallsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/analytics': typeof AnalyticsRoute
   '/attendance': typeof AttendanceRoute
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
+  '/create-account': typeof CreateAccountRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
   '/insights': typeof InsightsRoute
@@ -148,10 +162,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/analytics': typeof AnalyticsRoute
   '/attendance': typeof AttendanceRoute
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
+  '/create-account': typeof CreateAccountRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
   '/insights': typeof InsightsRoute
@@ -170,10 +186,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/analytics': typeof AnalyticsRoute
   '/attendance': typeof AttendanceRoute
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
+  '/create-account': typeof CreateAccountRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
   '/insights': typeof InsightsRoute
@@ -193,10 +211,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accept-invite'
     | '/analytics'
     | '/attendance'
     | '/audit-logs'
     | '/check-in'
+    | '/create-account'
     | '/escalations'
     | '/faculty'
     | '/insights'
@@ -214,10 +234,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accept-invite'
     | '/analytics'
     | '/attendance'
     | '/audit-logs'
     | '/check-in'
+    | '/create-account'
     | '/escalations'
     | '/faculty'
     | '/insights'
@@ -235,10 +257,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/accept-invite'
     | '/analytics'
     | '/attendance'
     | '/audit-logs'
     | '/check-in'
+    | '/create-account'
     | '/escalations'
     | '/faculty'
     | '/insights'
@@ -257,10 +281,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AcceptInviteRoute: typeof AcceptInviteRoute
   AnalyticsRoute: typeof AnalyticsRoute
   AttendanceRoute: typeof AttendanceRoute
   AuditLogsRoute: typeof AuditLogsRoute
   CheckInRoute: typeof CheckInRoute
+  CreateAccountRoute: typeof CreateAccountRoute
   EscalationsRoute: typeof EscalationsRoute
   FacultyRoute: typeof FacultyRoute
   InsightsRoute: typeof InsightsRoute
@@ -284,6 +310,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accept-invite': {
+      id: '/accept-invite'
+      path: '/accept-invite'
+      fullPath: '/accept-invite'
+      preLoaderRoute: typeof AcceptInviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/analytics': {
@@ -312,6 +345,13 @@ declare module '@tanstack/react-router' {
       path: '/check-in'
       fullPath: '/check-in'
       preLoaderRoute: typeof CheckInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create-account': {
+      id: '/create-account'
+      path: '/create-account'
+      fullPath: '/create-account'
+      preLoaderRoute: typeof CreateAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/escalations': {
@@ -417,10 +457,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AcceptInviteRoute: AcceptInviteRoute,
   AnalyticsRoute: AnalyticsRoute,
   AttendanceRoute: AttendanceRoute,
   AuditLogsRoute: AuditLogsRoute,
   CheckInRoute: CheckInRoute,
+  CreateAccountRoute: CreateAccountRoute,
   EscalationsRoute: EscalationsRoute,
   FacultyRoute: FacultyRoute,
   InsightsRoute: InsightsRoute,

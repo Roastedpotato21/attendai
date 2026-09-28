@@ -5,7 +5,7 @@
 BEGIN;
 
 CREATE TABLE public.institutions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   code TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',

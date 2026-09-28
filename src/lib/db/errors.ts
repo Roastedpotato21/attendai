@@ -125,7 +125,10 @@ type SupabasePgError = {
  * If called without an error object it returns a generic `DatabaseError`
  * (useful for "no data returned" situations).
  */
-export function fromSupabaseError(operation: string, error?: SupabasePgError | null): DatabaseError {
+export function fromSupabaseError(
+  operation: string,
+  error?: SupabasePgError | null,
+): DatabaseError {
   if (!error) {
     return new DatabaseError(operation, `${operation}: unexpected empty result`);
   }
