@@ -28,12 +28,14 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   "/create-account": { public: true },
   "/accept-invite": { public: true },
   "/check-in": { public: true },
+  "/guardian-notifications": { public: true },
 
   // Overview
   "/": { allowedRoles: ["admin", "faculty", "staff"] },
   "/student-dashboard": { allowedRoles: ["admin", "faculty", "staff"] },
   "/attendance": { allowedRoles: ["admin", "faculty"] },
   "/students": { allowedRoles: ["admin", "faculty", "staff"] },
+  "/guardian-devices": { allowedRoles: ["admin", "staff"] },
 
   // AI Communication
   "/voice-calls": { allowedRoles: ["admin", "staff"] },

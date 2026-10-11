@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Loader2, Send } from "lucide-react";
-import { sendTestSmsFn } from "@/lib/server-fns";
 
 import { PageHeader } from "@/components/common/page-parts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,30 +43,6 @@ function SettingsPage() {
   const [retries, setRetries] = useState([3]);
   const [autoCall, setAutoCall] = useState(true);
   const [autoEscalate, setAutoEscalate] = useState(true);
-  const [isTestingSms, setIsTestingSms] = useState(false);
-
-  const handleTestSms = async () => {
-    setIsTestingSms(true);
-    try {
-      const result = await sendTestSmsFn({
-        data: { recipientName: "Test Parent", studentName: "Test Student" },
-      });
-      if (result.ok) {
-        toast.success("Test SMS sent successfully!", {
-          description: `Provider: ${result.provider} | ID: ${result.messageId}`,
-        });
-      } else {
-        toast.error("Failed to send Test SMS", {
-          description: result.note || "Unknown error",
-        });
-      }
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : "Server error";
-      toast.error("Error sending test SMS", { description: msg });
-    } finally {
-      setIsTestingSms(false);
-    }
-  };
 
   return (
     <div className="mx-auto max-w-[1000px]">
@@ -180,35 +154,6 @@ function SettingsPage() {
                 <Label>Quiet hours end</Label>
                 <Input defaultValue="08:00" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-elevated border-destructive/20">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
-              Developer Testing
-            </CardTitle>
-            <CardDescription>
-              Test integrations in development. Requires .env configuration.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Twilio SMS Integration</p>
-                <p className="text-xs text-muted-foreground">
-                  Sends a test absence notification to the configured SMS_TEST_RECIPIENT
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={handleTestSms} disabled={isTestingSms}>
-                {isTestingSms ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
-                Send Test SMS
-              </Button>
             </div>
           </CardContent>
         </Card>

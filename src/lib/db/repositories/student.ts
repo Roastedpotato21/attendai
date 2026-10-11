@@ -81,6 +81,19 @@ const mapSupabaseStudent = (row: SupabaseStudentRow): PopulatedStudent => {
 };
 
 export const studentRepository = {
+  async findByClassId(classId: string): Promise<PopulatedStudent[]> {
+    if (hasDatabaseConnection() && supabase) {
+      const { data, error } = await supabase
+        .from("students")
+        .select("*, classes(*), parents(*)")
+        .eq("class_id", classId)
+        .eq("enrollment_status", "active")
+        .order("roll");
+      if (error) throw fromSupabaseError("class student list", error);
+      return (data ?? []).map((row) => mapSupabaseStudent(row as SupabaseStudentRow));
+    }
+    return (await this.findAll()).filter((student) => student.classId === classId);
+  },
   async findAll(): Promise<PopulatedStudent[]> {
     if (hasDatabaseConnection() && supabase) {
       const { data, error } = await supabase.from("students").select(`

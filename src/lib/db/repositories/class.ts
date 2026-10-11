@@ -3,6 +3,21 @@ import type { DbClass } from "../schema";
 import { fromSupabaseError } from "../errors";
 
 export const classRepository = {
+  async findManageable(): Promise<DbClass[]> {
+    const classes = await this.findAll();
+    if (!hasDatabaseConnection() || !supabase) return classes;
+    const client = supabase;
+    const allowed = await Promise.all(
+      classes.map(async (cls) => {
+        const { data, error } = await client.rpc("can_manage_class", {
+          target_class_id: cls.id,
+        });
+        if (error) throw fromSupabaseError("attendance class access", error);
+        return data === true ? cls : null;
+      }),
+    );
+    return allowed.filter((cls): cls is DbClass => cls !== null);
+  },
   async findByName(name: string): Promise<DbClass | null> {
     if (hasDatabaseConnection() && supabase) {
       const { data, error } = await supabase

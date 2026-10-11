@@ -131,6 +131,8 @@ export interface DbStudent extends TenantEntity {
 // ---------------------------------------------------------------------------
 
 export interface DbAttendanceSession extends TenantEntity {
+  revision?: number;
+  modifiedBy?: string | null;
   classId: string;
   date: string; // YYYY-MM-DD
   method: "manual" | "qr" | "face";
@@ -174,7 +176,7 @@ export interface DbQRCheckIn extends TenantEntity {
 export interface DbCommunication extends TenantEntity {
   studentId: string;
   parentId: string;
-  type: "voice" | "sms" | "whatsapp";
+  type: "voice" | "sms" | "whatsapp" | "push";
 
   // Voice specific
   durationSec?: number | null;

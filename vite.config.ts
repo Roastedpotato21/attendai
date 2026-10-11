@@ -22,6 +22,11 @@ function getLocalIp() {
 process.env["VITE_LOCAL_IP"] = getLocalIp();
 
 export default defineConfig({
+  vite: {
+    server: {
+      allowedHosts: ["scheduled-bras-totally-catering.trycloudflare.com"],
+    },
+  },
   // The Lovable wrapper intentionally exposes a narrow Nitro option type,
   // while Nitro itself supports explicit runtime plugins. Registering this
   // plugin wires Cloudflare's native scheduled event into the existing app.

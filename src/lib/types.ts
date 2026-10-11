@@ -55,12 +55,18 @@ export type AttendanceRecord = {
 
 export type AttendanceSubmission = {
   date: string; // YYYY-MM-DD
+  classId?: string;
+  sessionId?: string | undefined;
+  expectedRevision?: number | undefined;
   className: string;
   method: "faculty" | "qr" | "ai";
   records: AttendanceRecord[];
 };
 
 export type AttendanceSubmissionResult = {
+  sessionId?: string;
+  revision?: number | undefined;
+  updated?: boolean;
   success: boolean;
   message: string;
   totalPresent: number;
@@ -133,8 +139,19 @@ export type AuthUser = {
 // Messaging
 // ---------------------------------------------------------------------------
 
-export type MessageChannel = "SMS" | "WhatsApp";
-export type MessageStatus = "queued" | "delivered" | "read" | "sent" | "failed";
+export type MessageChannel = "SMS" | "WhatsApp" | "Push";
+export type MessageStatus =
+  | "queued"
+  | "delivered"
+  | "read"
+  | "sent"
+  | "failed"
+  | "undelivered"
+  | "unconfirmed"
+  | "provider_accepted"
+  | "no_registered_device"
+  | "suppressed"
+  | "dead_letter";
 
 export type MessageRecord = {
   id: string;

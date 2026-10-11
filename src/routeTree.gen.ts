@@ -18,6 +18,8 @@ import { Route as CheckInRouteImport } from './routes/check-in'
 import { Route as CreateAccountRouteImport } from './routes/create-account'
 import { Route as EscalationsRouteImport } from './routes/escalations'
 import { Route as FacultyRouteImport } from './routes/faculty'
+import { Route as GuardianDevicesRouteImport } from './routes/guardian-devices'
+import { Route as GuardianNotificationsRouteImport } from './routes/guardian-notifications'
 import { Route as InsightsRouteImport } from './routes/insights'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as InterventionsRouteImport } from './routes/interventions'
@@ -74,6 +76,16 @@ const EscalationsRoute = EscalationsRouteImport.update({
 const FacultyRoute = FacultyRouteImport.update({
   id: '/faculty',
   path: '/faculty',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuardianDevicesRoute = GuardianDevicesRouteImport.update({
+  id: '/guardian-devices',
+  path: '/guardian-devices',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuardianNotificationsRoute = GuardianNotificationsRouteImport.update({
+  id: '/guardian-notifications',
+  path: '/guardian-notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InsightsRoute = InsightsRouteImport.update({
@@ -147,6 +159,8 @@ export interface FileRoutesByFullPath {
   '/create-account': typeof CreateAccountRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
+  '/guardian-devices': typeof GuardianDevicesRoute
+  '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
   '/integrations': typeof IntegrationsRoute
   '/interventions': typeof InterventionsRoute
@@ -170,6 +184,8 @@ export interface FileRoutesByTo {
   '/create-account': typeof CreateAccountRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
+  '/guardian-devices': typeof GuardianDevicesRoute
+  '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
   '/integrations': typeof IntegrationsRoute
   '/interventions': typeof InterventionsRoute
@@ -194,6 +210,8 @@ export interface FileRoutesById {
   '/create-account': typeof CreateAccountRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
+  '/guardian-devices': typeof GuardianDevicesRoute
+  '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
   '/integrations': typeof IntegrationsRoute
   '/interventions': typeof InterventionsRoute
@@ -219,6 +237,8 @@ export interface FileRouteTypes {
     | '/create-account'
     | '/escalations'
     | '/faculty'
+    | '/guardian-devices'
+    | '/guardian-notifications'
     | '/insights'
     | '/integrations'
     | '/interventions'
@@ -242,6 +262,8 @@ export interface FileRouteTypes {
     | '/create-account'
     | '/escalations'
     | '/faculty'
+    | '/guardian-devices'
+    | '/guardian-notifications'
     | '/insights'
     | '/integrations'
     | '/interventions'
@@ -265,6 +287,8 @@ export interface FileRouteTypes {
     | '/create-account'
     | '/escalations'
     | '/faculty'
+    | '/guardian-devices'
+    | '/guardian-notifications'
     | '/insights'
     | '/integrations'
     | '/interventions'
@@ -289,6 +313,8 @@ export interface RootRouteChildren {
   CreateAccountRoute: typeof CreateAccountRoute
   EscalationsRoute: typeof EscalationsRoute
   FacultyRoute: typeof FacultyRoute
+  GuardianDevicesRoute: typeof GuardianDevicesRoute
+  GuardianNotificationsRoute: typeof GuardianNotificationsRoute
   InsightsRoute: typeof InsightsRoute
   IntegrationsRoute: typeof IntegrationsRoute
   InterventionsRoute: typeof InterventionsRoute
@@ -366,6 +392,20 @@ declare module '@tanstack/react-router' {
       path: '/faculty'
       fullPath: '/faculty'
       preLoaderRoute: typeof FacultyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guardian-devices': {
+      id: '/guardian-devices'
+      path: '/guardian-devices'
+      fullPath: '/guardian-devices'
+      preLoaderRoute: typeof GuardianDevicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guardian-notifications': {
+      id: '/guardian-notifications'
+      path: '/guardian-notifications'
+      fullPath: '/guardian-notifications'
+      preLoaderRoute: typeof GuardianNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/insights': {
@@ -465,6 +505,8 @@ const rootRouteChildren: RootRouteChildren = {
   CreateAccountRoute: CreateAccountRoute,
   EscalationsRoute: EscalationsRoute,
   FacultyRoute: FacultyRoute,
+  GuardianDevicesRoute: GuardianDevicesRoute,
+  GuardianNotificationsRoute: GuardianNotificationsRoute,
   InsightsRoute: InsightsRoute,
   IntegrationsRoute: IntegrationsRoute,
   InterventionsRoute: InterventionsRoute,

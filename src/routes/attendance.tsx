@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Check,
   Clock,
-  Send,
+  MessageSquare,
   X,
   Filter,
   Save,
@@ -59,7 +59,8 @@ import type {
   QRSession,
   QRCheckIn,
 } from "@/lib/types";
-import { studentService, attendanceService, qrService, auditService } from "@/lib/services";
+import { attendanceService, qrService, auditService } from "@/lib/services";
+import type { DbClass } from "@/lib/db/schema";
 import { useAuth } from "@/components/auth/auth-context";
 import { LOCAL_IP } from "@/lib/local-ip";
 
@@ -87,7 +88,17 @@ function AttendancePage() {
   const [rows, setRows] = useState<Student[]>([]);
   const [query, setQuery] = useState("");
   const [classFilter, setClassFilter] = useState("all");
-  const [dateStr, setDateStr] = useState(new Date().toISOString().split("T")[0]!);
+  const [dateStr, setDateStr] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  });
+  const [classOptions, setClassOptions] = useState<DbClass[]>([]);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [isLoadingRegister, setIsLoadingRegister] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [savedSessionId, setSavedSessionId] = useState<string | null>(null);
+  const [savedRevision, setSavedRevision] = useState<number | undefined>(undefined);
+  const selectedClass = classOptions.find((cls) => cls.id === classFilter);
   const [mode, setMode] = useState<"manual" | "qr">("manual");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,12 +121,23 @@ function AttendancePage() {
   }, [qrSession]);
 
   useEffect(() => {
-    studentService.getAll().then((data) => {
-      setRows(data);
-    });
+    let active = true;
+    attendanceService
+      .getClasses()
+      .then((data) => {
+        if (active) setClassOptions(data);
+      })
+      .catch((error: unknown) => {
+        if (active)
+          setLoadError(error instanceof Error ? error.message : "Unable to load classes.");
+      })
+      .finally(() => {
+        if (active) setIsLoadingClasses(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
-
-  const classOptions = useMemo(() => Array.from(new Set(rows.map((s) => s.className))), [rows]);
 
   useEffect(() => {
     qrSessionRef.current = qrSession;
@@ -123,13 +145,45 @@ function AttendancePage() {
 
   // When class/date changes, reset marked status and active QR sessions
   useEffect(() => {
+    let active = true;
     setMarkedStatus({});
+    setRows([]);
+    setSavedSessionId(null);
+    setSavedRevision(undefined);
+    setSummary(null);
     const activeSession = qrSessionRef.current;
     if (activeSession) {
       void qrService.stopSession(activeSession.id);
       setQrSession(null);
       setQrCheckIns([]);
     }
+    if (classFilter === "all") {
+      setIsLoadingRegister(false);
+      return;
+    }
+    setIsLoadingRegister(true);
+    setLoadError(null);
+    attendanceService
+      .getRegister(classFilter, dateStr)
+      .then((register) => {
+        if (!active) return;
+        setRows(register.students);
+        setSavedSessionId(register.session?.id ?? null);
+        setSavedRevision(register.session?.revision);
+        setMarkedStatus(
+          Object.fromEntries(register.records.map((record) => [record.studentId, record.status])),
+        );
+      })
+      .catch((error: unknown) => {
+        if (active)
+          setLoadError(error instanceof Error ? error.message : "Unable to load attendance.");
+      })
+      .finally(() => {
+        if (active) setIsLoadingRegister(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [classFilter, dateStr]);
 
   // Poll for QR check-ins if session is active
@@ -197,9 +251,7 @@ function AttendancePage() {
   }, [rows, markedStatus, mode, qrCheckIns]);
 
   const filtered = students.filter(
-    (s) =>
-      (classFilter === "all" || s.className === classFilter) &&
-      (s.name.toLowerCase().includes(query.toLowerCase()) || s.roll.includes(query)),
+    (s) => s.name.toLowerCase().includes(query.toLowerCase()) || s.roll.includes(query),
   );
 
   const setStatus = async (id: string, status: StudentStatus) => {
@@ -247,7 +299,12 @@ function AttendancePage() {
     setIsStartingQR(true);
     toast.loading("Generating Secure QR...", { id: "qr" });
     try {
-      const session = await qrService.startSession(classFilter, dateStr, 5, user.id);
+      const session = await qrService.startSession(
+        selectedClass?.name ?? classFilter,
+        dateStr,
+        5,
+        user.id,
+      );
       console.log("[QR CLIENT] generated session ID:", session.id);
 
       // We must construct an explicit dev network URL if available instead of window.location.origin
@@ -279,7 +336,11 @@ function AttendancePage() {
       return;
     }
 
-    const unmarked = filtered.filter((s) => s.status === "unmarked");
+    if (isLoadingRegister || loadError || students.length === 0) {
+      toast.error("Load a class with students before submitting attendance.");
+      return;
+    }
+    const unmarked = students.filter((s) => s.status === "unmarked");
     if (unmarked.length > 0) {
       toast.error(`${unmarked.length} students are still unmarked.`);
       return;
@@ -291,9 +352,12 @@ function AttendancePage() {
     try {
       const result = await attendanceService.submitAttendance({
         date: dateStr,
-        className: classFilter,
+        classId: classFilter,
+        sessionId: savedSessionId ?? undefined,
+        expectedRevision: savedRevision,
+        className: selectedClass?.fullName ?? classFilter,
         method: mode === "qr" ? "qr" : "faculty",
-        records: filtered.map((s) => ({
+        records: students.map((s) => ({
           studentId: s.id,
           status: s.status,
         })),
@@ -301,6 +365,8 @@ function AttendancePage() {
 
       toast.success(result.message, { id: "submit" });
       setSummary(result);
+      setSavedSessionId(result.sessionId ?? null);
+      setSavedRevision(result.revision);
     } catch (error) {
       console.error(error);
       const msg = error instanceof Error ? error.message : "Failed to submit attendance";
@@ -310,31 +376,11 @@ function AttendancePage() {
     }
   };
 
-  const notifyAbsentees = async () => {
-    const absentees = filtered.filter((s) => s.status === "absent");
-    if (!absentees.length) {
-      toast.info("No absentees in the current view");
-      return;
-    }
-    toast.loading("Queueing AI outreach…", { id: "notify" });
-    try {
-      toast.success(`${absentees.length} consented parent notifications are queued`, {
-        id: "notify",
-        description:
-          "Attendance submission creates durable outbox jobs; this action does not send a message.",
-      });
-      setSummary(null);
-    } catch (error) {
-      console.error("Notify absentees failed:", error);
-      toast.error("Failed to queue notifications — please try again", { id: "notify" });
-    }
-  };
-
   const counts = {
-    present: filtered.filter((s) => s.status === "present").length,
-    absent: filtered.filter((s) => s.status === "absent").length,
-    late: filtered.filter((s) => s.status === "late").length,
-    unmarked: filtered.filter((s) => s.status === "unmarked").length,
+    present: students.filter((s) => s.status === "present").length,
+    absent: students.filter((s) => s.status === "absent").length,
+    late: students.filter((s) => s.status === "late").length,
+    unmarked: students.filter((s) => s.status === "unmarked").length,
   };
 
   return (
@@ -377,13 +423,14 @@ function AttendancePage() {
             <CardDescription>
               {classFilter === "all"
                 ? "Select a class to mark attendance"
-                : `${filtered.length} students in ${classFilter}`}
+                : `${students.length} students in ${selectedClass?.fullName ?? "selected class"}`}
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Input
               type="date"
+              disabled={isSubmitting}
               value={dateStr}
               onChange={(e) => setDateStr(e.target.value)}
               className="h-9 w-[150px]"
@@ -391,18 +438,34 @@ function AttendancePage() {
           </div>
         </CardHeader>
         <CardContent>
+          {!isLoadingClasses && !loadError && classOptions.length === 0 && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              No classes are available for attendance. Ask your administrator to create a class or
+              assign you to one.
+            </p>
+          )}
+          {loadError && (
+            <p role="alert" className="mb-4 text-sm text-destructive">
+              {loadError}
+            </p>
+          )}
+          {savedSessionId && (
+            <p className="mb-4 text-sm text-muted-foreground">
+              Saved attendance loaded for {dateStr}.
+            </p>
+          )}
           <Tabs value={mode} onValueChange={(v) => setMode(v as "manual" | "qr")} className="mb-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Select value={classFilter} onValueChange={setClassFilter}>
+                <Select value={classFilter} onValueChange={setClassFilter} disabled={isSubmitting}>
                   <SelectTrigger className="h-9 w-[150px]">
                     <SelectValue placeholder="Class" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Select a class</SelectItem>
                     {classOptions.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.fullName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -540,6 +603,12 @@ function AttendancePage() {
                       Please select a class to begin marking attendance for {dateStr}.
                     </TableCell>
                   </TableRow>
+                ) : isLoadingRegister ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                      Loading register...
+                    </TableCell>
+                  </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
@@ -567,6 +636,7 @@ function AttendancePage() {
                         <div className="inline-flex gap-1">
                           <Button
                             size="sm"
+                            disabled={isSubmitting}
                             variant={s.status === "present" ? "default" : "outline"}
                             onClick={() => setStatus(s.id, "present")}
                           >
@@ -574,6 +644,7 @@ function AttendancePage() {
                           </Button>
                           <Button
                             size="sm"
+                            disabled={isSubmitting}
                             variant={s.status === "absent" ? "destructive" : "outline"}
                             onClick={() => setStatus(s.id, "absent")}
                           >
@@ -581,6 +652,7 @@ function AttendancePage() {
                           </Button>
                           <Button
                             size="sm"
+                            disabled={isSubmitting}
                             variant={s.status === "late" ? "secondary" : "outline"}
                             onClick={() => setStatus(s.id, "late")}
                           >
@@ -597,9 +669,18 @@ function AttendancePage() {
         </CardContent>
         {classFilter !== "all" && (
           <CardFooter className="flex justify-end border-t pt-4">
-            <Button onClick={submitRegister} disabled={isSubmitting || qrSession?.active}>
+            <Button
+              onClick={submitRegister}
+              disabled={
+                isSubmitting ||
+                isLoadingRegister ||
+                students.length === 0 ||
+                !!loadError ||
+                qrSession?.active
+              }
+            >
               <Save className="mr-2 h-4 w-4" />
-              {isSubmitting ? "Submitting..." : "Submit Register"}
+              {isSubmitting ? "Saving..." : savedSessionId ? "Save Changes" : "Submit Register"}
             </Button>
           </CardFooter>
         )}
@@ -608,9 +689,11 @@ function AttendancePage() {
       <Dialog open={!!summary} onOpenChange={(open) => !open && setSummary(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Register Submitted</DialogTitle>
+            <DialogTitle>
+              {summary?.updated ? "Register Updated" : "Register Submitted"}
+            </DialogTitle>
             <DialogDescription>
-              Attendance for {classFilter} on {dateStr} has been saved.
+              Attendance for {selectedClass?.fullName} on {dateStr} has been saved.
             </DialogDescription>
           </DialogHeader>
           {summary && (
@@ -630,14 +713,24 @@ function AttendancePage() {
                 </div>
               </div>
 
+              {summary.totalAbsent > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Absence alerts are queued only for guardians with consent and notifications
+                  enabled, subject to rate limits. Check message status to see whether an alert was
+                  created and delivered.
+                </p>
+              )}
+
               <DialogFooter className="sm:justify-between">
                 <Button variant="outline" onClick={() => setSummary(null)}>
                   Close
                 </Button>
                 {summary.totalAbsent > 0 && (
-                  <Button onClick={notifyAbsentees}>
-                    <Send className="mr-2 h-4 w-4" />
-                    Notify Absentees
+                  <Button asChild>
+                    <Link to="/messages">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      View Message Status
+                    </Link>
                   </Button>
                 )}
               </DialogFooter>

@@ -2,13 +2,13 @@ const EmbeddedPostgres = require("embedded-postgres").default;
 const { Client } = require("pg");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
+const { execFile } = require("node:child_process");
+const { promisify } = require("node:util");
 
 async function main() {
   const port = 54323;
-  const dbDir = path.join(__dirname, "../data/test-db");
-  if (fs.existsSync(dbDir)) {
-    fs.rmSync(dbDir, { recursive: true, force: true });
-  }
+  const dbDir = fs.mkdtempSync(path.join(os.tmpdir(), "attendai-db-test-"));
 
   const pg = new EmbeddedPostgres({
     port,
@@ -459,6 +459,28 @@ async function main() {
   }
   console.log("  ✓ consented absence created one durable outbox job:", outboxRes.rows[0]);
 
+  // Keep the historical SMS worker regression on a legacy fixture. New
+  // attendance jobs use the separate push claim/finish path, tested above.
+  const legacyFixture = await client.query(
+    `
+    WITH communication AS (
+      INSERT INTO public.communications
+        (institution_id, student_id, parent_id, type, direction, message_status, body, idempotency_key)
+      SELECT c.institution_id, c.student_id, c.parent_id, 'sms', 'outbound',
+        'queued', 'Historical SMS worker fixture', 'legacy-worker-fixture:' || gen_random_uuid()
+      FROM public.communications c
+      JOIN public.communication_jobs source ON source.communication_id = c.id
+      WHERE source.id = $1 RETURNING id, institution_id
+    )
+    INSERT INTO public.communication_jobs
+      (institution_id, communication_id, channel, idempotency_key)
+    SELECT institution_id, id, 'sms', 'legacy-worker-job:' || id::TEXT FROM communication
+    RETURNING id
+  `,
+    [outboxRes.rows[0].id],
+  );
+  const legacyJobId = legacyFixture.rows[0].id;
+
   const claimRes = await client.query(
     `SELECT id, status, attempts, lease_owner FROM public.claim_communication_jobs(10);`,
   );
@@ -480,7 +502,7 @@ async function main() {
   }
   console.log("  ✓ durable idempotency key is unique");
 
-  const originalClaim = claimRes.rows.find((row) => row.id === outboxRes.rows[0].id);
+  const originalClaim = claimRes.rows.find((row) => row.id === legacyJobId);
   const originalFinished = await client.query(
     `SELECT public.finish_communication_job($1, $2, $3::jsonb) AS finished`,
     [
@@ -511,7 +533,7 @@ async function main() {
     WHERE source.id = $1
     RETURNING id
     `,
-    [outboxRes.rows[0].id],
+    [legacyJobId],
   );
   if (insertedConcurrent.rows.length !== 2) throw new Error("Concurrent fixtures were not created");
 
@@ -572,7 +594,7 @@ async function main() {
     FROM public.communication_jobs WHERE id = $1
     RETURNING id
     `,
-    [outboxRes.rows[0].id],
+    [legacyJobId],
   );
   const staleClaim = await client.query(
     `SELECT id, attempts, lease_owner, last_error FROM public.claim_communication_jobs(1)`,
@@ -626,7 +648,7 @@ async function main() {
     FROM public.communication_jobs WHERE id = $1
     RETURNING id
     `,
-    [outboxRes.rows[0].id],
+    [legacyJobId],
   );
   const permanentClaim = await client.query(
     `SELECT id, lease_owner FROM public.claim_communication_jobs(1) WHERE id = $1`,
@@ -653,8 +675,29 @@ async function main() {
   if (emptyClaim.rows.length !== 0) throw new Error("Empty queue claim returned work");
   console.log("  ✓ empty queue returned immediately without creating work");
 
+  console.log("11. Testing SMS integration with disposable attendance and simulated delivery...");
+  await require("./verify-sms-flow.cjs")(client);
+
+  console.log("Closing disposable database connection...");
   await client.end();
-  await pg.stop();
+  console.log("Stopping disposable PostgreSQL...");
+  if (process.platform === "win32") {
+    // embedded-postgres uses taskkill on Windows, which can hang in restricted
+    // shells after PostgreSQL has already completed every assertion.
+    const pgCtl = path.join(
+      __dirname,
+      "..",
+      "node_modules",
+      "@embedded-postgres",
+      "windows-x64",
+      "native",
+      "bin",
+      "pg_ctl.exe",
+    );
+    await promisify(execFile)(pgCtl, ["-D", dbDir, "-m", "fast", "-w", "stop"]);
+  } else {
+    await pg.stop();
+  }
   console.log("All local database verifications passed successfully!");
 }
 

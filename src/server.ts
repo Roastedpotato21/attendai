@@ -4,6 +4,10 @@ import { renderErrorPage } from "./lib/error-page";
 import { handleCommunicationWorkerRequest } from "./lib/server/communication-worker-endpoint";
 import { handleTwilioStatusWebhook } from "./lib/server/communication-webhooks";
 import {
+  handleGuardianNotificationAdmin,
+  handleGuardianNotificationDevice,
+} from "./lib/server/guardian-notifications";
+import {
   handleStaffInvitationRequest,
   handleStaffManagementRequest,
 } from "./lib/server/staff-invitations";
@@ -55,6 +59,12 @@ export default {
       if (new URL(request.url).pathname === "/api/internal/communications/process") {
         return handleCommunicationWorkerRequest(request);
       }
+      if (new URL(request.url).pathname === "/api/admin/guardian-notifications") {
+        return handleGuardianNotificationAdmin(request);
+      }
+      if (new URL(request.url).pathname.startsWith("/api/guardian/notifications/")) {
+        return handleGuardianNotificationDevice(request);
+      }
       if (new URL(request.url).pathname === "/api/admin/staff-invitations") {
         return handleStaffInvitationRequest(request);
       }
@@ -63,12 +73,40 @@ export default {
       }
       if (new URL(request.url).pathname === "/api/webhooks/twilio/status") {
         if (request.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+        const configuredUrl = process.env["TWILIO_WEBHOOK_PUBLIC_URL"];
+        if (!configuredUrl) return new Response("Webhook is not configured", { status: 503 });
+        let expected: URL;
+        try {
+          expected = new URL(configuredUrl);
+        } catch {
+          return new Response("Webhook is not configured", { status: 503 });
+        }
+        if (
+          expected.protocol !== "https:" ||
+          expected.pathname !== "/api/webhooks/twilio/status" ||
+          expected.search
+        ) {
+          return new Response("Webhook is not configured", { status: 503 });
+        }
+        if (
+          !(request.headers.get("content-type") ?? "")
+            .toLowerCase()
+            .startsWith("application/x-www-form-urlencoded")
+        ) {
+          return new Response("Unsupported callback content type", { status: 415 });
+        }
         const body = await request.text();
-        const params = Object.fromEntries(new URLSearchParams(body).entries());
-        const publicUrl = process.env["TWILIO_WEBHOOK_PUBLIC_URL"] ?? request.url;
+        const form = new URLSearchParams(body);
+        const params: Record<string, string> = {};
+        for (const [key, value] of form) {
+          if (Object.hasOwn(params, key))
+            return new Response("Duplicate callback field", { status: 400 });
+          params[key] = value;
+        }
+        const callbackUrl = configuredUrl + new URL(request.url).search;
         try {
           await handleTwilioStatusWebhook({
-            url: publicUrl,
+            url: callbackUrl,
             signature: request.headers.get("x-twilio-signature"),
             params,
           });

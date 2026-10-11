@@ -1,5 +1,6 @@
-/** Server-only Twilio delivery callback handling for Phase 3B. */
+/** Server-only Twilio delivery callbacks. Database writes follow SDK validation. */
 import { createClient } from "@supabase/supabase-js";
+import twilio from "twilio";
 
 type Callback = { url: string; signature: string | null; params: Record<string, string> };
 
@@ -12,7 +13,7 @@ function db() {
 
 function normalizeStatus(
   value: string | undefined,
-): "queued" | "sent" | "delivered" | "read" | "failed" {
+): "queued" | "sent" | "delivered" | "read" | "failed" | "undelivered" {
   switch (value?.toLowerCase()) {
     case "queued":
       return "queued";
@@ -25,55 +26,39 @@ function normalizeStatus(
     case "read":
       return "read";
     case "failed":
-    case "undelivered":
       return "failed";
+    case "undelivered":
+      return "undelivered";
     default:
       throw new Error("unsupported provider status");
   }
 }
 
-/** Twilio signs URL + alphabetically ordered form fields with HMAC-SHA1. */
+/** Twilio's official SDK handles canonical URL and form-field signatures. */
 export async function verifyTwilioSignature(callback: Callback): Promise<boolean> {
   const token = process.env["TWILIO_AUTH_TOKEN"];
   if (!token || !callback.signature) return false;
-  const expectedPayload =
-    callback.url +
-    Object.keys(callback.params)
-      .sort()
-      .map((key) => `${key}${callback.params[key] ?? ""}`)
-      .join("");
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(token),
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"],
-  );
-  const raw = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(expectedPayload));
-  const expected = btoa(String.fromCharCode(...new Uint8Array(raw)));
-  if (expected.length !== callback.signature.length) return false;
-  let mismatch = 0;
-  for (let index = 0; index < expected.length; index++)
-    mismatch |= expected.charCodeAt(index) ^ callback.signature.charCodeAt(index);
-  return mismatch === 0;
+  try {
+    if (new URL(callback.url).protocol !== "https:") return false;
+    return twilio.validateRequest(token, callback.signature, callback.url, callback.params);
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Call only after reading the raw form body at the API boundary. The callback
- * never accepts an institution ID: tenant resolution comes from the stored
- * Twilio SID, after a valid signature is verified.
- */
+/** Resolve the tenant from the stored provider SID, never an untrusted tenant ID. */
 export async function handleTwilioStatusWebhook(
   callback: Callback,
 ): Promise<{ duplicate: boolean; status: string }> {
   if (!(await verifyTwilioSignature(callback))) throw new Error("invalid Twilio webhook signature");
-  const providerId = callback.params["MessageSid"] ?? callback.params["CallSid"];
-  if (!providerId) throw new Error("Twilio callback has no provider SID");
-  const provider = "twilio";
-  const status = normalizeStatus(callback.params["MessageStatus"] ?? callback.params["CallStatus"]);
+  const providerId = callback.params["MessageSid"];
+  if (!providerId) throw new Error("Twilio callback has no message SID");
+  const status = normalizeStatus(callback.params["MessageStatus"] ?? callback.params["SmsStatus"]);
+  const communicationId = new URL(callback.url).searchParams.get("communication_id");
   const { data, error } = await db().rpc("apply_communication_callback", {
     p_sid: providerId,
     p_status: status,
+    p_communication_id: communicationId,
   });
   if (error) throw new Error("callback persistence rejected");
   return data as { duplicate: boolean; status: string };

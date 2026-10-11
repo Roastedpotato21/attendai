@@ -40,9 +40,12 @@ export async function handleCommunicationWorkerRequest(
   const runId = options.runId ?? randomUUID();
   const started = Date.now();
   try {
-    const result = await (options.processJobs ?? processCommunicationJobs)(
-      options.batchSize ?? communicationWorkerBatchSize(),
-    );
+    const processor =
+      options.processJobs ??
+      (process.env["NOTIFICATION_PROVIDER"] === "fcm"
+        ? (await import("./push-worker.ts")).processPushJobs
+        : processCommunicationJobs);
+    const result = await processor(options.batchSize ?? communicationWorkerBatchSize());
     const summary: WorkerRunSummary = { runId, ...result, durationMs: Date.now() - started };
     console.info("[communication-worker] run complete", summary);
     return Response.json(summary);

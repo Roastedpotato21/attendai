@@ -37,12 +37,14 @@ supabase/.temp/
 *.crt
 *.pfx
 *.p12
+*service-account*.json
 
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
 
 # Testing & Coverage
+.tmp/
 coverage/
 *.lcov
 .nyc_output/

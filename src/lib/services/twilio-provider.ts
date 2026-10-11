@@ -361,13 +361,7 @@ export const mockTwilioProvider = {
  * Get appropriate provider based on configuration
  */
 export function getTwilioProvider() {
-  const useRealProvider = !!process.env["TWILIO_ACCOUNT_SID"] && !!process.env["TWILIO_AUTH_TOKEN"];
-
-  if (useRealProvider) {
-    logger.info("Using real Twilio provider");
-    return twilioSmsProvider;
-  }
-
-  logger.info("Using mock Twilio provider");
+  // Legacy callers have no durable job, consent check, or dispatch fence.
+  // Credentials must never turn this path into paid delivery.
   return mockTwilioProvider;
 }

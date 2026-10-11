@@ -2,7 +2,7 @@
  * Attendance data-access service.
  *
  * All operations go through the hardened attendanceRepository and classRepository.
- * Submissions use the atomic submit_attendance RPC (with graceful sequential fallback).
+ * Supabase submissions require the atomic submit_attendance RPC.
  */
 
 import type {
@@ -12,12 +12,22 @@ import type {
   AttendanceSubmission,
   AttendanceSubmissionResult,
   StudentDashboardData,
+  Student,
 } from "@/lib/types";
-import type { DbAttendanceRecord, DbAttendanceSession } from "../db/schema";
-import { attendanceRepository, classRepository } from "../db/repositories";
+import type { DbAttendanceRecord, DbAttendanceSession, DbClass } from "../db/schema";
+import { attendanceRepository, classRepository, studentRepository } from "../db/repositories";
 import { NotFoundError, ValidationError } from "../db/errors";
 
 export interface AttendanceService {
+  getClasses(): Promise<DbClass[]>;
+  getRegister(
+    classId: string,
+    date: string,
+  ): Promise<{
+    students: Student[];
+    session: DbAttendanceSession | null;
+    records: DbAttendanceRecord[];
+  }>;
   getTrend(): Promise<AttendanceTrend[]>;
   getClassAttendance(): Promise<ClassAttendance[]>;
   getLanguageSplit(): Promise<LanguageSplit[]>;
@@ -26,6 +36,35 @@ export interface AttendanceService {
 }
 
 export const attendanceService: AttendanceService = {
+  getClasses() {
+    return classRepository.findManageable();
+  },
+
+  async getRegister(classId, date) {
+    const [roster, session] = await Promise.all([
+      studentRepository.findByClassId(classId),
+      attendanceRepository.findSessionByClassDate(classId, date),
+    ]);
+    const records = session ? await attendanceRepository.findRecordsBySessionId(session.id) : [];
+    return {
+      session,
+      records,
+      students: roster.map((s) => ({
+        id: s.id,
+        name: s.name,
+        roll: s.roll,
+        className: s.class.fullName,
+        section: s.class.section,
+        parentName: s.parent.name,
+        parentPhone: s.parent.phone,
+        language: s.parent.language,
+        attendanceRate: s.attendanceRate,
+        consecutiveAbsences: s.consecutiveAbsences,
+        status: s.status,
+        risk: s.risk,
+      })),
+    };
+  },
   async getTrend(): Promise<AttendanceTrend[]> {
     return [
       { day: "Mon", present: 94, absent: 6, calls: 4 },
@@ -101,7 +140,9 @@ export const attendanceService: AttendanceService = {
   },
 
   async submitAttendance(submission: AttendanceSubmission): Promise<AttendanceSubmissionResult> {
-    const cls = await classRepository.findByName(submission.className);
+    const cls = submission.classId
+      ? await classRepository.findById(submission.classId)
+      : await classRepository.findByName(submission.className);
     if (!cls) {
       throw new NotFoundError("attendance submission", `Class "${submission.className}" not found`);
     }
@@ -116,26 +157,25 @@ export const attendanceService: AttendanceService = {
       }
     }
 
-    const counts = {
-      present: submission.records.filter((r) => r.status === "present").length,
-      absent: submission.records.filter((r) => r.status === "absent").length,
-      late: submission.records.filter((r) => r.status === "late").length,
-    };
-
     // Map UI submission method ('faculty' | 'qr' | 'ai') to schema enum ('manual' | 'qr' | 'face')
     const dbMethod: DbAttendanceSession["method"] =
       submission.method === "faculty" ? "manual" : submission.method === "qr" ? "qr" : "face";
 
     // Atomically submit via repository
-    const { session } = await attendanceRepository.submitAttendance(
-      cls.id,
-      submission.date,
-      dbMethod,
-      submission.records.map((r) => ({
-        studentId: r.studentId,
-        status: r.status as DbAttendanceRecord["status"],
-      })),
-    );
+    const records = submission.records.map((r) => ({
+      studentId: r.studentId,
+      status: r.status as DbAttendanceRecord["status"],
+    }));
+    if (submission.sessionId && submission.expectedRevision === undefined) {
+      throw new Error("Attendance editing needs the attendance corrections database migration.");
+    }
+    const { session } = submission.sessionId
+      ? await attendanceRepository.updateAttendance(
+          submission.sessionId,
+          submission.expectedRevision!,
+          records,
+        )
+      : await attendanceRepository.submitAttendance(cls.id, submission.date, dbMethod, records);
 
     // Phase 3B intentionally does not dispatch providers from this application
     // process. In Supabase mode, migration 00007 atomically creates consented
@@ -144,10 +184,15 @@ export const attendanceService: AttendanceService = {
 
     return {
       success: true,
-      message: `Successfully submitted attendance for ${submission.className}.`,
-      totalPresent: counts.present,
-      totalAbsent: counts.absent,
-      totalLate: counts.late,
+      sessionId: session.id,
+      revision: session.revision,
+      updated: !!submission.sessionId,
+      message: submission.sessionId
+        ? "Attendance updated successfully."
+        : "Attendance submitted successfully.",
+      totalPresent: session.totalPresent,
+      totalAbsent: session.totalAbsent,
+      totalLate: session.totalLate,
     };
   },
 };

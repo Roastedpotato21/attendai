@@ -3,6 +3,21 @@ import type { DbAttendanceSession, DbAttendanceRecord } from "../schema";
 import { fromSupabaseError } from "../errors";
 
 export const attendanceRepository = {
+  async findSessionByClassDate(classId: string, date: string): Promise<DbAttendanceSession | null> {
+    if (hasDatabaseConnection() && supabase) {
+      const { data, error } = await supabase
+        .from("attendance_sessions")
+        .select("id")
+        .eq("class_id", classId)
+        .eq("date", date)
+        .maybeSingle();
+      if (error) throw fromSupabaseError("daily attendance lookup", error);
+      return data ? this.findSessionById(data.id) : null;
+    }
+    return (
+      memoryDb.attendanceSessions.find((s) => s.classId === classId && s.date === date) ?? null
+    );
+  },
   async createSession(
     session: Omit<DbAttendanceSession, "id" | "institutionId" | "createdAt" | "updatedAt">,
   ): Promise<DbAttendanceSession> {
@@ -25,6 +40,8 @@ export const attendanceRepository = {
 
       return {
         id: data.id,
+        revision: data.revision,
+        modifiedBy: data.modified_by,
         institutionId: data.institution_id,
         classId: data.class_id,
         date: data.date,
@@ -39,6 +56,7 @@ export const attendanceRepository = {
 
     const newSession: DbAttendanceSession = {
       ...session,
+      revision: 0,
       id: `session-${Date.now()}`,
       institutionId:
         memoryDb.classes.find((item) => item.id === session.classId)?.institutionId ??
@@ -95,8 +113,7 @@ export const attendanceRepository = {
   /**
    * Atomic attendance submission via PostgreSQL RPC (when available).
    *
-   * Falls back to sequential createSession + createRecords when the RPC
-   * does not exist yet (e.g. migration 00006 not applied).
+   * Requires the RPC in Supabase mode so partial submissions cannot survive.
    */
   async submitAttendance(
     classId: string,
@@ -122,25 +139,13 @@ export const attendanceRepository = {
       );
 
       if (rpcError) {
-        // If the function doesn't exist (42883), fall back to sequential writes
-        if (rpcError.code === "42883") {
-          console.warn("[Attendance] submit_attendance RPC not found, using sequential writes");
-          const session = await this.createSession({
-            classId,
-            date,
-            method,
-            totalPresent: records.filter((r) => r.status === "present").length,
-            totalAbsent: records.filter((r) => r.status === "absent").length,
-            totalLate: records.filter((r) => r.status === "late").length,
-          });
-          const recs = await this.createRecords(
-            records.map((r) => ({
-              sessionId: session.id,
-              studentId: r.studentId,
-              status: r.status,
-            })),
+        if (rpcError.code === "42883" || rpcError.code === "PGRST202") {
+          throw new Error(
+            "Attendance setup is incomplete. Apply the submit_attendance database migration.",
           );
-          return { session, records: recs };
+        }
+        if (rpcError.code === "23505") {
+          throw new Error("Attendance has already been submitted for this class and date.");
         }
         throw fromSupabaseError("attendance submit", rpcError);
       }
@@ -152,6 +157,12 @@ export const attendanceRepository = {
       // Fetch the created session and records
       const session = await this.findSessionById(sessionId);
       if (!session) throw fromSupabaseError("attendance submit: session not found after RPC");
+      // Keep the version/counts of this write if another editor commits before
+      // the readback. Reading a later revision would hide a concurrent edit.
+      session.revision = result.revision ?? 0;
+      session.totalPresent = result.total_present;
+      session.totalAbsent = result.total_absent;
+      session.totalLate = result.total_late;
       const createdRecords = await this.findRecordsBySessionId(sessionId);
 
       return { session, records: createdRecords };
@@ -172,6 +183,63 @@ export const attendanceRepository = {
     return { session, records: recs };
   },
 
+  async updateAttendance(
+    sessionId: string,
+    expectedRevision: number,
+    records: Array<{ studentId: string; status: DbAttendanceRecord["status"] }>,
+  ): Promise<{ session: DbAttendanceSession; records: DbAttendanceRecord[] }> {
+    if (hasDatabaseConnection() && supabase) {
+      const { data, error } = await supabase.rpc("update_attendance", {
+        p_session_id: sessionId,
+        p_expected_revision: expectedRevision,
+        p_records: records.map((r) => ({ student_id: r.studentId, status: r.status })),
+      });
+      if (error?.code === "PT409") {
+        throw new Error(
+          "Attendance was changed by another staff member. Reload the register before saving.",
+        );
+      }
+      if (error?.code === "42883" || error?.code === "PGRST202") {
+        throw new Error("Attendance editing needs the attendance corrections database migration.");
+      }
+      if (error) throw fromSupabaseError("attendance update", error);
+      const session = await this.findSessionById(sessionId);
+      if (!session) throw fromSupabaseError("updated attendance session lookup");
+      session.revision = data.revision;
+      session.totalPresent = data.total_present;
+      session.totalAbsent = data.total_absent;
+      session.totalLate = data.total_late;
+      return { session, records: await this.findRecordsBySessionId(sessionId) };
+    }
+    const session = memoryDb.attendanceSessions.find((s) => s.id === sessionId);
+    if (!session) throw new Error("Attendance session not found.");
+    if ((session.revision ?? 0) !== expectedRevision) {
+      throw new Error(
+        "Attendance was changed by another staff member. Reload the register before saving.",
+      );
+    }
+    for (const record of records) {
+      const existing = memoryDb.attendanceRecords.find(
+        (r) => r.sessionId === sessionId && r.studentId === record.studentId,
+      );
+      if (!existing) throw new Error("Attendance record not found.");
+    }
+    for (const record of records) {
+      const existing = memoryDb.attendanceRecords.find(
+        (r) => r.sessionId === sessionId && r.studentId === record.studentId,
+      )!;
+      existing.status = record.status;
+      existing.updatedAt = new Date().toISOString();
+    }
+    const saved = await this.findRecordsBySessionId(sessionId);
+    session.totalPresent = saved.filter((r) => r.status === "present").length;
+    session.totalAbsent = saved.filter((r) => r.status === "absent").length;
+    session.totalLate = saved.filter((r) => r.status === "late").length;
+    session.revision = expectedRevision + 1;
+    session.updatedAt = new Date().toISOString();
+    return { session, records: saved };
+  },
+
   async findSessionById(id: string): Promise<DbAttendanceSession | null> {
     if (hasDatabaseConnection() && supabase) {
       const { data, error } = await supabase
@@ -185,6 +253,8 @@ export const attendanceRepository = {
 
       return {
         id: data.id,
+        revision: data.revision,
+        modifiedBy: data.modified_by,
         institutionId: data.institution_id,
         classId: data.class_id,
         date: data.date,

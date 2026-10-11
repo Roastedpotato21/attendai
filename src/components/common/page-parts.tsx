@@ -122,6 +122,8 @@ const successStatuses = new Set([
 const warningStatuses = new Set([
   "late",
   "sent",
+  "queued",
+  "unconfirmed",
   "in-progress",
   "acknowledged",
   "medium",
@@ -133,11 +135,13 @@ const warningStatuses = new Set([
 const dangerStatuses = new Set([
   "absent",
   "failed",
+  "undelivered",
   "no-answer",
   "open",
   "high",
   "unreachable",
   "critical",
+  "dead_letter",
 ]);
 
 export function toneForStatus(status: string): StatusTone {

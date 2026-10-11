@@ -5,6 +5,7 @@ import {
   Users,
   PhoneCall,
   MessageSquare,
+  BellRing,
   Sparkles,
   FileBarChart,
   TriangleAlert,
@@ -59,7 +60,8 @@ const groups: NavGroup[] = [
     label: "AI Communication",
     items: [
       { title: "AI Voice Calls", url: "/voice-calls", icon: PhoneCall },
-      { title: "SMS / WhatsApp", url: "/messages", icon: MessageSquare },
+      { title: "Guardian Messages", url: "/messages", icon: MessageSquare },
+      { title: "Guardian Devices", url: "/guardian-devices", icon: BellRing },
       { title: "AI Insights", url: "/insights", icon: Sparkles },
       { title: "Templates", url: "/templates", icon: FileText },
     ],
