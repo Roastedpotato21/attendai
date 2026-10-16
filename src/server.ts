@@ -4,6 +4,7 @@ import { renderErrorPage } from "./lib/error-page";
 import { handleCommunicationWorkerRequest } from "./lib/server/communication-worker-endpoint";
 import { handleTwilioStatusWebhook } from "./lib/server/communication-webhooks";
 import { handleFast2SmsRequest } from "./lib/server/fast2sms-endpoint";
+import { createClient } from "@supabase/supabase-js";
 import {
   handleGuardianNotificationAdmin,
   handleGuardianNotificationDevice,
@@ -54,9 +55,35 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+async function policyGate(request: Request): Promise<Response | null> {
+  const bearer = request.headers.get("authorization");
+  if (!bearer?.startsWith("Bearer "))
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!url || !key)
+    return Response.json({ error: "Policy verification unavailable" }, { status: 503 });
+  const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: auth, error } = await db.auth.getUser(bearer.slice(7));
+  if (error || !auth.user)
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  const { data: accepted, error: policyError } = await db.rpc("has_current_policy_acceptance", {
+    p_user: auth.user.id,
+  });
+  if (policyError)
+    return Response.json({ error: "Policy verification unavailable" }, { status: 503 });
+  if (accepted !== true)
+    return Response.json({ error: "Current policies must be accepted" }, { status: 403 });
+  return null;
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (new URL(request.url).pathname.startsWith("/api/admin/")) {
+        const rejection = await policyGate(request);
+        if (rejection) return rejection;
+      }
       if (new URL(request.url).pathname.startsWith("/api/internal/communications/fast2sms/")) {
         return handleFast2SmsRequest(request);
       }

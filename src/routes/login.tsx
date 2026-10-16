@@ -154,6 +154,14 @@ function LoginPage() {
             >
               Create an administrator account
             </Link>
+            <p className="mt-4 flex justify-center gap-4 text-xs">
+              <Link to="/privacy" className="hover:underline">
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="hover:underline">
+                Terms & Conditions
+              </Link>
+            </p>
           </div>
         </CardContent>
       </Card>

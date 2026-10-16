@@ -12,12 +12,21 @@ export const Route = createFileRoute("/guardian-devices")({
   component: GuardianDevices,
 });
 
-type Device = { id: string; active: boolean; permission: string };
+type Device = {
+  id: string;
+  active: boolean;
+  permission: string;
+  consent: boolean;
+  registeredAt: string;
+  lastSeenAt: string;
+  revokedAt: string | null;
+};
 type Guardian = {
   id: string;
   name: string;
   communicationConsent: boolean;
   active: boolean;
+  students: { name: string; receivesNotifications: boolean }[];
   devices: Device[];
 };
 
@@ -84,7 +93,7 @@ function GuardianDevices() {
     <div className="mx-auto max-w-4xl space-y-4">
       <PageHeader
         title="Guardian notification devices"
-        description="Invite guardians to enroll their browser once for attendance alerts."
+        description="Generate a private consent link for a guardian's linked students, then manage each enrolled device."
       />
       {error && (
         <p role="alert" className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
@@ -110,7 +119,11 @@ function GuardianDevices() {
       <div className="space-y-3">
         {guardians.map((guardian) => {
           const active = guardian.devices.filter(
-            (device) => device.active && device.permission === "granted",
+            (device) =>
+              device.active &&
+              !device.revokedAt &&
+              device.permission === "granted" &&
+              device.consent,
           );
           return (
             <Card key={guardian.id}>
@@ -127,6 +140,32 @@ function GuardianDevices() {
                       ? `${active.length} active device${active.length === 1 ? "" : "s"}`
                       : "No registered device"}
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    Linked students:{" "}
+                    {guardian.students?.length
+                      ? guardian.students
+                          .map(
+                            (student) =>
+                              `${student.name}${student.receivesNotifications ? "" : " (alerts off)"}`,
+                          )
+                          .join(", ")
+                      : "None"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Notification consent:{" "}
+                    {guardian.devices.some((device) => device.consent && device.active)
+                      ? "Recorded"
+                      : "Not recorded for an active device"}
+                  </p>
+                  {guardian.devices.map((device, index) => (
+                    <p key={device.id} className="text-xs text-muted-foreground">
+                      Device {index + 1}:{" "}
+                      {device.active && !device.revokedAt ? "active" : "revoked"}; consent{" "}
+                      {device.consent ? "recorded" : "required"}; registered{" "}
+                      {new Date(device.registeredAt).toLocaleDateString()}; last seen{" "}
+                      {new Date(device.lastSeenAt).toLocaleDateString()}
+                    </p>
+                  ))}
                 </div>
                 <Button
                   size="sm"

@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth/auth-context";
 import { LogOut } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
@@ -56,6 +57,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </header>
           <main className="flex-1 p-4 sm:p-6">{children}</main>
+          <footer className="flex justify-center gap-4 border-t px-4 py-3 text-xs text-muted-foreground">
+            <Link to="/privacy" className="hover:underline">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" className="hover:underline">
+              Terms & Conditions
+            </Link>
+          </footer>
         </div>
       </div>
     </SidebarProvider>

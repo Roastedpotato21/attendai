@@ -16,10 +16,14 @@ import {
 import { runCommunicationSchedule } from "../src/lib/server/communication-scheduler.ts";
 import { verifyTwilioSignature } from "../src/lib/server/communication-webhooks.ts";
 import { renderSmsTemplate } from "../src/lib/server/sms-template.ts";
-import { processPushJobs } from "../src/lib/server/push-worker.ts";
+import { processPushJobs, renderPushPayload } from "../src/lib/server/push-worker.ts";
+import { isFreshAttendanceSession } from "../src/lib/server/attendance-freshness.ts";
 import {
   classifyFcmError,
   sendGuardianNotification,
+  sendOfflineDeliveryTest,
+  sendControlledDeliveryTest,
+  sendGuardianTransportTest,
   verifyFcmAdminAuthentication,
 } from "../src/lib/server/fcm-provider.ts";
 import { getTwilioProvider } from "../src/lib/services/twilio-provider.ts";
@@ -681,6 +685,40 @@ test("push worker sends once per eligible installation and records both results"
   assert.equal(finishes.length, 2);
 });
 
+test("attendance push uses canonical student, date and institution data", () => {
+  const payload = renderPushPayload({
+    communication: { metadata: { attendance_date: "2026-10-16" } },
+    guardian: {},
+    student: { name: "Student One" },
+    institutionName: "ABC School",
+  });
+  assert.equal(payload.title, "Attendance Alert");
+  assert.equal(
+    payload.body,
+    "Dear Parent, Student One was marked absent on October 16, 2026. Please contact ABC School if you believe this is incorrect.",
+  );
+  assert.doesNotMatch(payload.body, /10000000-0000/);
+});
+
+test("old queued absences fail the attendance freshness rule", () => {
+  const now = Date.parse("2026-10-16T12:00:00Z");
+  const session = {
+    date: "2026-10-16",
+    created_at: "2026-10-16T10:00:00Z",
+    status: "submitted",
+    institution_id: "tenant",
+  };
+  assert.equal(isFreshAttendanceSession(session, now), true);
+  assert.equal(
+    isFreshAttendanceSession(
+      { ...session, created_at: "2026-10-05T10:00:00Z", date: "2026-10-05" },
+      now,
+    ),
+    false,
+  );
+  assert.equal(isFreshAttendanceSession({ ...session, status: "draft" }, now), false);
+});
+
 test("push worker suppresses ineligible jobs before any provider call", async () => {
   let sends = 0;
   let suppressed = false;
@@ -797,8 +835,62 @@ test("FCM validation-only request targets the enrolled FID with the exact alert"
     );
     assert.equal(
       submitted.message.webpush.fcm_options.link,
-      "https://attendai.example.invalid/guardian-notifications",
+      "https://attendai.example.invalid/guardian-notifications?event=10000000-0000-4000-8000-000000000001",
     );
+    assert.equal(submitted.message.webpush.headers.TTL, "21600");
+    assert.equal(
+      submitted.message.webpush.notification.tag,
+      "10000000-0000-4000-8000-000000000001",
+    );
+    const offline = await sendOfflineDeliveryTest({
+      installationId: "fid-guardian-trial-0001",
+      testId: "10000000-0000-4000-8000-000000000002",
+    });
+    assert.equal(offline.ok, true);
+    assert.equal(submitted.message.notification.title, "AttendAI Offline Delivery Test");
+    assert.equal(
+      submitted.message.notification.body,
+      "This test checks delayed notification delivery after internet reconnects.",
+    );
+    assert.equal(submitted.message.webpush.headers.TTL, "300");
+    assert.equal(submitted.message.data.testId, "10000000-0000-4000-8000-000000000002");
+    const online = await sendControlledDeliveryTest({
+      installationId: "fid-guardian-trial-0001",
+      testId: "10000000-0000-4000-8000-000000000003",
+      mode: "online",
+    });
+    assert.equal(online.ok, true);
+    assert.equal(submitted.message.notification.title, "AttendAI Online Push Test");
+    assert.equal(submitted.message.data.testMode, "online");
+    assert.match(submitted.message.notification.body, /No attendance action/);
+    const guardianTest = await sendGuardianTransportTest(
+      {
+        installationId: "fid-guardian-trial-0001",
+        testId: "10000000-0000-4000-8000-000000000004",
+        studentName: "Student One",
+      },
+      true,
+    );
+    assert.equal(guardianTest.ok, true);
+    assert.equal(submitted.validate_only, true);
+    assert.equal(submitted.message.notification.title, "AttendAI Notification Test");
+    assert.equal(
+      submitted.message.notification.body,
+      "Notifications are enabled for Student One. No attendance action is required.",
+    );
+    for (const [errorCode, expectedKind] of [
+      ["INVALID_ARGUMENT", "permanent"],
+      ["UNREGISTERED", "invalid_device"],
+    ]) {
+      globalThis.fetch = async () =>
+        Response.json({ error: { details: [{ errorCode }] } }, { status: 400 });
+      const rejected = await sendControlledDeliveryTest({
+        installationId: "fid-guardian-trial-0001",
+        testId: "10000000-0000-4000-8000-000000000003",
+        mode: "online",
+      });
+      assert.equal(rejected.kind, expectedKind);
+    }
   } finally {
     globalThis.fetch = originalFetch;
     for (const key of keys) {

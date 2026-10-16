@@ -6,21 +6,40 @@ INSERT INTO public.guardian_notification_invitations
 VALUES
   ('11111111-1111-4111-8111-111111111111', '30000000-0000-4000-8000-000000000001', repeat('a',64), now() + INTERVAL '15 minutes', '00000000-0000-4000-8000-000000000001'),
   ('11111111-1111-4111-8111-111111111111', '30000000-0000-4000-8000-000000000001', repeat('b',64), now() + INTERVAL '15 minutes', '00000000-0000-4000-8000-000000000001'),
-  ('11111111-1111-4111-8111-111111111111', '30000000-0000-4000-8000-000000000001', repeat('c',64), now() - INTERVAL '1 minute', '00000000-0000-4000-8000-000000000001');
+  ('11111111-1111-4111-8111-111111111111', '30000000-0000-4000-8000-000000000001', repeat('c',64), now() - INTERVAL '1 minute', '00000000-0000-4000-8000-000000000001'),
+  ('11111111-1111-4111-8111-111111111111', '30000000-0000-4000-8000-000000000001', repeat('0',64), now() + INTERVAL '15 minutes', '00000000-0000-4000-8000-000000000001');
+INSERT INTO public.guardian_notification_invitations
+  (institution_id, guardian_id, token_hash, expires_at, revoked_at, created_by)
+VALUES ('11111111-1111-4111-8111-111111111111', '30000000-0000-4000-8000-000000000001', repeat('9',64), now() + INTERVAL '15 minutes', now(), '00000000-0000-4000-8000-000000000001');
 
-DO $$ DECLARE first_id UUID; second_id UUID; BEGIN
-  first_id := public.consume_guardian_notification_invitation(repeat('a',64), 'fid-guardian-phone-0001', repeat('d',64), 'attendai-41f64');
-  second_id := public.consume_guardian_notification_invitation(repeat('b',64), 'fid-guardian-tablet-0002', repeat('e',64), 'attendai-41f64');
+DO $$ DECLARE first_id UUID; second_id UUID; renewed_id UUID; BEGIN
+  first_id := public.consume_guardian_notification_invitation_with_consent(repeat('a',64), 'fid-guardian-phone-0001', repeat('d',64), 'attendai-41f64', '2026-10-16.1');
+  second_id := public.consume_guardian_notification_invitation_with_consent(repeat('b',64), 'fid-guardian-tablet-0002', repeat('e',64), 'attendai-41f64', '2026-10-16.1');
   IF first_id = second_id OR (SELECT count(*) FROM public.guardian_notification_installations
       WHERE guardian_id = '30000000-0000-4000-8000-000000000001' AND active) <> 2 THEN
     RAISE EXCEPTION 'multi-device enrollment failed'; END IF;
+  renewed_id := public.consume_guardian_notification_invitation_with_consent(repeat('0',64), 'fid-guardian-phone-0001', repeat('6',64), 'attendai-41f64', '2026-10-16.1');
+  IF renewed_id <> first_id OR
+     (SELECT count(*) FROM public.guardian_notification_consents
+       WHERE installation_id = first_id AND status = 'accepted') <> 1 OR
+     (SELECT count(*) FROM public.guardian_notification_consents
+       WHERE installation_id = first_id AND status = 'revoked') <> 1 THEN
+    RAISE EXCEPTION 'device re-enrollment did not preserve consent history'; END IF;
   BEGIN
-    PERFORM public.consume_guardian_notification_invitation(repeat('a',64), 'fid-guardian-replay-0003', repeat('f',64), 'attendai-41f64');
+    PERFORM public.consume_guardian_notification_invitation_with_consent(repeat('a',64), 'fid-guardian-replay-0003', repeat('f',64), 'attendai-41f64', '2026-10-16.1');
     RAISE EXCEPTION 'replayed invitation accepted';
   EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
   BEGIN
-    PERFORM public.consume_guardian_notification_invitation(repeat('c',64), 'fid-guardian-expired-0004', repeat('f',64), 'attendai-41f64');
+    PERFORM public.consume_guardian_notification_invitation_with_consent(repeat('c',64), 'fid-guardian-expired-0004', repeat('f',64), 'attendai-41f64', '2026-10-16.1');
     RAISE EXCEPTION 'expired invitation accepted';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
+  BEGIN
+    PERFORM public.consume_guardian_notification_invitation_with_consent(repeat('9',64), 'fid-guardian-revoked-0005', repeat('f',64), 'attendai-41f64', '2026-10-16.1');
+    RAISE EXCEPTION 'revoked invitation accepted';
+  EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
+  BEGIN
+    PERFORM public.consume_guardian_notification_invitation_with_consent(repeat('c',64), 'fid-guardian-no-consent-0006', repeat('f',64), 'attendai-41f64', 'old-version');
+    RAISE EXCEPTION 'outdated consent version accepted';
   EXCEPTION WHEN SQLSTATE '22023' THEN NULL; END;
 END $$;
 
@@ -78,8 +97,14 @@ DO $$ DECLARE j public.communication_jobs; device RECORD; decision TEXT; outcome
     WHERE firebase_project_id = 'siri-1b57c' LIMIT 1;
   IF public.begin_push_dispatch(j.id, j.lease_owner, old_id) <> 'ineligible' THEN
     RAISE EXCEPTION 'old-project device passed new FCM dispatch fence'; END IF;
-  FOR device IN SELECT id FROM public.guardian_notification_installations
-    WHERE guardian_id = '30000000-0000-4000-8000-000000000001' AND active LOOP
+  SELECT id INTO old_id FROM public.guardian_notification_installations
+    WHERE firebase_installation_id = 'fid-new-project-0008';
+  IF public.begin_push_dispatch(j.id, j.lease_owner, old_id) <> 'ineligible' THEN
+    RAISE EXCEPTION 'legacy device without explicit notice consent passed dispatch fence'; END IF;
+  FOR device IN SELECT i.id FROM public.guardian_notification_installations i
+    JOIN public.guardian_notification_consents c ON c.installation_id = i.id
+    WHERE i.guardian_id = '30000000-0000-4000-8000-000000000001' AND i.active
+      AND c.status = 'accepted' LOOP
     decision := public.begin_push_dispatch(j.id, j.lease_owner, device.id);
     IF decision <> 'send' THEN RAISE EXCEPTION 'device send fence failed: %', decision; END IF;
     IF NOT public.finish_push_dispatch(j.id, j.lease_owner, device.id, 'provider_accepted',
@@ -91,7 +116,7 @@ DO $$ DECLARE j public.communication_jobs; device RECORD; decision TEXT; outcome
   outcome := public.complete_push_job(j.id, j.lease_owner, false);
   IF outcome <> 'provider_accepted' OR
      (SELECT count(*) FROM public.communication_dispatches WHERE job_id = j.id
-       AND status = 'provider_accepted') <> 3 THEN
+       AND status = 'provider_accepted') <> 2 THEN
     RAISE EXCEPTION 'multi-device accepted state was not preserved'; END IF;
   IF (SELECT message_status FROM public.communications WHERE id = j.communication_id)
      <> 'provider_accepted' THEN RAISE EXCEPTION 'FCM acceptance was mislabeled'; END IF;

@@ -1,4 +1,4 @@
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { KeyRound } from "lucide-react";
 
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { hasDatabaseConnection, supabase } from "@/lib/db/connection";
+import { acceptPolicies } from "@/lib/policy-acceptance";
 
 export const Route = createFileRoute("/accept-invite")({
   head: () => ({ meta: [{ title: "Set your password — AttendAI" }] }),
@@ -19,6 +20,8 @@ function AcceptInvitePage() {
   const { completeInvitation } = useAuth();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [isValidInvite, setIsValidInvite] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,8 +55,13 @@ function AcceptInvitePage() {
       setError("The passwords do not match.");
       return;
     }
+    if (!termsAccepted || !privacyAcknowledged) {
+      setError("Accept the Terms & Conditions and acknowledge the Privacy Policy to finish setup.");
+      return;
+    }
     setIsSubmitting(true);
     try {
+      await acceptPolicies("signup");
       await completeInvitation(password);
       await router.navigate({ to: "/", replace: true });
     } catch (acceptError) {
@@ -111,6 +119,40 @@ function AcceptInvitePage() {
                   onChange={(event) => setConfirmPassword(event.target.value)}
                   required
                 />
+              </div>
+              <div className="space-y-3 border-t pt-4 text-sm">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={termsAccepted}
+                    onChange={(event) => setTermsAccepted(event.target.checked)}
+                    required
+                  />
+                  <span>
+                    I have read and agree to the{" "}
+                    <Link to="/terms" target="_blank" className="text-primary underline">
+                      Terms & Conditions
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={privacyAcknowledged}
+                    onChange={(event) => setPrivacyAcknowledged(event.target.checked)}
+                    required
+                  />
+                  <span>
+                    I acknowledge the{" "}
+                    <Link to="/privacy" target="_blank" className="text-primary underline">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                </label>
               </div>
               <Button className="mt-2 w-full" type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Finishing setup…" : "Finish setup"}

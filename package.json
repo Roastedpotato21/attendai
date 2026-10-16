@@ -8,10 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "node --env-file-if-exists=.env scripts/preview.mjs",
-    "test:communications": "node --test scripts/test-communications.mjs scripts/test-fast2sms.mjs",
+    "test:communications": "node --test scripts/test-communications.mjs scripts/test-fast2sms.mjs scripts/test-guardian-security.mjs",
     "test:sms": "node --test scripts/test-fast2sms.mjs",
     "test:auth-errors": "node --experimental-strip-types --test scripts/test-auth-errors.mjs",
     "test:auth-browser": "node scripts/test-auth-browser.mjs",
+    "test:guardian-browser": "node scripts/test-guardian-browser.mjs",
     "test:attendance-browser": "node --env-file-if-exists=.env scripts/test-attendance-browser.mjs",
     "test:attendance-supabase": "node --env-file-if-exists=.env scripts/verify-attendance-supabase.mjs",
     "test:postgres": "node scripts/verify-postgres.cjs",
@@ -50,9 +51,9 @@
     "@supabase/supabase-js": "^2.112.2",
     "@tailwindcss/vite": "^4.2.1",
     "@tanstack/react-query": "^5.101.1",
-    "@tanstack/react-router": "1.170.18",
-    "@tanstack/react-start": "1.168.32",
-    "@tanstack/router-plugin": "1.168.23",
+    "@tanstack/react-router": "1.170.44",
+    "@tanstack/react-start": "1.169.2",
+    "@tanstack/router-plugin": "1.168.46",
     "@yudiel/react-qr-scanner": "^2.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -60,7 +61,6 @@
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.19.0",
-    "firebase-admin": "^14.5.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
@@ -78,6 +78,11 @@
     "vaul": "^1.1.2",
     "vite-tsconfig-paths": "^6.0.2",
     "zod": "^3.24.2"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "^1.14.5"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

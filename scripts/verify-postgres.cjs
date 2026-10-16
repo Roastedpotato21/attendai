@@ -95,6 +95,12 @@ async function main() {
   console.log("3. Applying seed.sql...");
   const seedSql = fs.readFileSync(path.join(__dirname, "../supabase/seed.sql"), "utf8");
   await client.query(seedSql);
+  // Existing seeded identities are treated as accepted in legacy behavior tests.
+  await client.query(`
+    INSERT INTO public.user_policy_acceptances(user_id, policy_version_id, acceptance_method)
+    SELECT u.id, v.id, 'access_gate' FROM auth.users u CROSS JOIN public.policy_versions v
+    WHERE v.active ON CONFLICT DO NOTHING;
+  `);
   console.log("  ✓ seed.sql applied successfully");
 
   console.log("4. Verifying staff invitation lifecycle...");
@@ -136,6 +142,19 @@ async function main() {
   );
   await client.query(`SET ROLE authenticated;`);
   await client.query(`SELECT set_config('request.jwt.claim.sub', '${lifecycleAuthId}', false);`);
+  try {
+    await client.query(`SELECT public.activate_my_staff_invitation()`);
+    throw new Error("Staff invitation bypassed policy acceptance");
+  } catch (error) {
+    if (error.message === "Staff invitation bypassed policy acceptance" || error.code !== "42501")
+      throw error;
+  }
+  const invitePolicies = (await client.query(`SELECT public.my_policy_status() AS policies`))
+    .rows[0].policies;
+  await client.query(`SELECT public.accept_current_policies($1,$2,'signup')`, [
+    invitePolicies.find((row) => row.type === "terms").id,
+    invitePolicies.find((row) => row.type === "privacy").id,
+  ]);
   const activation = await client.query(
     `SELECT public.activate_my_staff_invitation() AS institution_id;`,
   );
@@ -213,6 +232,21 @@ async function main() {
   );
   await client.query(`SET ROLE authenticated;`);
   await client.query(`SELECT set_config('request.jwt.claim.sub', '${onboardingAuthId}', false);`);
+  try {
+    await client.query(`SELECT public.provision_my_new_institution();`);
+    throw new Error("Onboarding bypassed policy acceptance");
+  } catch (error) {
+    if (error.message === "Onboarding bypassed policy acceptance" || error.code !== "42501")
+      throw error;
+  }
+  const policyIds = await client.query(`SELECT public.my_policy_status() AS policies`);
+  const termsId = policyIds.rows[0]?.policies?.find((row) => row.type === "terms")?.id;
+  const privacyId = policyIds.rows[0]?.policies?.find((row) => row.type === "privacy")?.id;
+  if (!termsId || !privacyId) throw new Error("Required policies are missing");
+  await client.query(`SELECT public.accept_current_policies($1,$2,'signup')`, [termsId, privacyId]);
+  const policyAccepted = await client.query(`SELECT public.my_policy_status() AS policies`);
+  if (!policyAccepted.rows[0]?.policies?.every((row) => row.accepted))
+    throw new Error("Versioned policy acceptance was not persisted");
   const onboarding = await client.query(
     `SELECT public.provision_my_new_institution() AS institution_id;`,
   );
@@ -241,6 +275,27 @@ async function main() {
     throw new Error("First-admin onboarding was not idempotent");
   }
   await client.query(`RESET ROLE;`);
+  await client.query(
+    `UPDATE public.policy_versions SET active = false WHERE policy_type = 'terms'`,
+  );
+  await client.query(`INSERT INTO public.policy_versions(policy_type,version,content_revision,active)
+    VALUES ('terms','test-next-version','test-next-version',true)`);
+  await client.query(`SET ROLE authenticated;`);
+  const reconsent = await client.query(`SELECT public.my_policy_status() AS policies`);
+  if (reconsent.rows[0]?.policies?.find((row) => row.type === "terms")?.accepted !== false)
+    throw new Error("New policy version did not trigger re-consent");
+  try {
+    await client.query(`SELECT public.provision_my_new_institution()`);
+    throw new Error("Existing user bypassed re-consent");
+  } catch (error) {
+    if (error.message === "Existing user bypassed re-consent" || error.code !== "42501")
+      throw error;
+  }
+  await client.query(`RESET ROLE;`);
+  await client.query(
+    `UPDATE public.policy_versions SET active = false WHERE version = 'test-next-version'`,
+  );
+  await client.query(`UPDATE public.policy_versions SET active = true WHERE id = $1`, [termsId]);
 
   const unverifiedAuthId = "00000000-0000-4000-8000-000000000090";
   await client.query(
@@ -258,6 +313,7 @@ async function main() {
   );
   await client.query(`SET ROLE authenticated;`);
   await client.query(`SELECT set_config('request.jwt.claim.sub', '${unverifiedAuthId}', false);`);
+  await client.query(`SELECT public.accept_current_policies($1,$2,'signup')`, [termsId, privacyId]);
   try {
     await client.query(`SELECT public.provision_my_new_institution();`);
     throw new Error("Unverified email created an institution");
@@ -307,6 +363,21 @@ async function main() {
   );
 
   console.log("6. Running Phase 2 test suite...");
+  // Legacy database fixtures create additional Auth identities. Treat those
+  // identities as already accepted so the older tenant/RLS tests retain their
+  // original focus; onboarding above verifies the missing-acceptance gate.
+  await client.query(`
+    CREATE FUNCTION public.accept_fixture_policies() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+    BEGIN
+      INSERT INTO public.user_policy_acceptances(user_id, policy_version_id, acceptance_method)
+      SELECT NEW.id, id, 'access_gate' FROM public.policy_versions WHERE active
+      ON CONFLICT DO NOTHING;
+      RETURN NEW;
+    END $$;
+    CREATE TRIGGER accept_fixture_policies AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.accept_fixture_policies();
+  `);
   const testsDir = path.join(__dirname, "../supabase/tests/database");
   const testFiles = fs
     .readdirSync(testsDir)

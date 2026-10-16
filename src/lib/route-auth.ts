@@ -29,6 +29,9 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   "/accept-invite": { public: true },
   "/check-in": { public: true },
   "/guardian-notifications": { public: true },
+  "/privacy": { public: true },
+  "/terms": { public: true },
+  "/policy-consent": { public: true },
 
   // Overview
   "/": { allowedRoles: ["admin", "faculty", "staff"] },

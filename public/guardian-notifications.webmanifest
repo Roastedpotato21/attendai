@@ -1,0 +1,14 @@
+{
+  "id": "/guardian-notifications",
+  "name": "AttendAI Notifications",
+  "short_name": "AttendAI Alerts",
+  "description": "Attendance notifications for linked students",
+  "start_url": "/guardian-notifications",
+  "scope": "/guardian-notifications",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#17365d",
+  "icons": [
+    { "src": "/guardian-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

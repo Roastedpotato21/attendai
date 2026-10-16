@@ -1,6 +1,9 @@
 /** FCM outbox worker. The scheduler calls this only with an explicit live gate. */
 import { createClient } from "@supabase/supabase-js";
-import { renderSmsTemplate, type SmsTemplate } from "./sms-template.ts";
+import {
+  isFreshAttendanceSession,
+  type AttendanceSessionFreshness,
+} from "./attendance-freshness.ts";
 import {
   sendGuardianNotification,
   verifyFcmAdminAuthentication,
@@ -22,12 +25,12 @@ type Loaded = {
   student: Record<string, unknown>;
   eligible: boolean;
   installations: Installation[];
-  template: SmsTemplate | undefined;
   institutionName: string;
 };
 
 export type PushWorkerStore = {
   claim: (limit: number) => Promise<PushJob[]>;
+  claimSpecific?: (jobId: string) => Promise<PushJob[]>;
   load: (job: PushJob) => Promise<Loaded | null>;
   begin: (job: PushJob, installation: Installation) => Promise<string>;
   finish: (job: PushJob, installation: Installation, result: PushResult) => Promise<boolean>;
@@ -50,6 +53,11 @@ function supabaseStore(): PushWorkerStore {
       if (error) throw new Error("Unable to claim push jobs");
       return (data ?? []) as PushJob[];
     },
+    async claimSpecific(jobId) {
+      const { data, error } = await db.rpc("claim_specific_push_job", { p_job: jobId });
+      if (error) throw new Error("Unable to claim controlled push job");
+      return (data ?? []) as PushJob[];
+    },
     async load(job) {
       const { data, error } = await db
         .from("communications")
@@ -70,7 +78,6 @@ function supabaseStore(): PushWorkerStore {
         { data: attendance, error: attendanceError },
         { data: installations, error: installationError },
         { data: institution, error: institutionError },
-        { data: templates, error: templateError },
       ] = await Promise.all([
         db
           .from("student_parents")
@@ -81,7 +88,7 @@ function supabaseStore(): PushWorkerStore {
           .maybeSingle(),
         db
           .from("attendance_records")
-          .select("status")
+          .select("status,attendance_sessions!inner(date,created_at,status,institution_id)")
           .eq("institution_id", job.institution_id)
           .eq("student_id", communication["student_id"])
           .eq("session_id", metadata["attendance_session_id"])
@@ -92,30 +99,17 @@ function supabaseStore(): PushWorkerStore {
           .eq("institution_id", job.institution_id)
           .eq("guardian_id", communication["parent_id"])
           .eq("active", true)
+          .is("revoked_at", null)
           .eq("firebase_project_id", "attendai-41f64")
           .eq("permission_state", "granted")
           .gte("last_seen_at", new Date(Date.now() - 90 * 86400000).toISOString()),
         db.from("institutions").select("name").eq("id", job.institution_id).maybeSingle(),
-        db
-          .from("sms_templates")
-          .select("id,institution_id,event_type,channel,language,content,approved_variables,active")
-          .eq("institution_id", job.institution_id)
-          .eq("event_type", "absence-alert")
-          .eq("channel", "sms")
-          .eq("active", true)
-          .limit(5),
       ]);
-      if (
-        relationshipError ||
-        attendanceError ||
-        installationError ||
-        institutionError ||
-        templateError
-      )
+      if (relationshipError || attendanceError || installationError || institutionError)
         throw new Error("Unable to verify push eligibility");
-      const language = String(guardian["language"] ?? "en");
-      const template = (templates?.find((candidate) => candidate.language === language) ??
-        templates?.find((candidate) => candidate.language === "en")) as SmsTemplate | undefined;
+      const sessionRelation = attendance?.attendance_sessions as unknown;
+      const session = (Array.isArray(sessionRelation) ? sessionRelation[0] : sessionRelation) as
+        AttendanceSessionFreshness | undefined;
       const eligible =
         communication["type"] === "push" &&
         communication["institution_id"] === job.institution_id &&
@@ -126,6 +120,8 @@ function supabaseStore(): PushWorkerStore {
         guardian["communication_consent"] === true &&
         relationship?.receives_notifications === true &&
         attendance?.status === "absent" &&
+        session?.institution_id === job.institution_id &&
+        isFreshAttendanceSession(session) &&
         metadata["purpose"] === "absence-alert";
       return {
         communication,
@@ -133,7 +129,6 @@ function supabaseStore(): PushWorkerStore {
         student,
         eligible,
         installations: (installations ?? []) as Installation[],
-        template,
         institutionName: String(institution?.name ?? "the institution"),
       };
     },
@@ -178,7 +173,7 @@ function supabaseStore(): PushWorkerStore {
   };
 }
 
-function payload(loaded: Loaded): { title: string; body: string } {
+export function renderPushPayload(loaded: Loaded): { title: string; body: string } {
   const metadata = (loaded.communication["metadata"] ?? {}) as Record<string, unknown>;
   const dateValue = String(metadata["attendance_date"] ?? "");
   const date = /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
@@ -186,19 +181,7 @@ function payload(loaded: Loaded): { title: string; body: string } {
         new Date(`${dateValue}T12:00:00Z`),
       )
     : "today";
-  let body = `${String(loaded.student["name"] ?? "Your student")} was marked absent on ${date}. Please contact the institution if this is incorrect.`;
-  if (loaded.template) {
-    try {
-      body = renderSmsTemplate(loaded.template, {
-        institution_name: loaded.institutionName,
-        guardian_name: String(loaded.guardian["name"] ?? ""),
-        student_name: String(loaded.student["name"] ?? ""),
-        attendance_date: dateValue,
-      });
-    } catch {
-      /* Keep a minimal English fallback. */
-    }
-  }
+  const body = `Dear Parent, ${String(loaded.student["name"] ?? "your student")} was marked absent on ${date}. Please contact ${loaded.institutionName} if you believe this is incorrect.`;
   return { title: "Attendance Alert", body: body.slice(0, 350) };
 }
 
@@ -208,16 +191,21 @@ export async function processPushJobs(
     store?: PushWorkerStore;
     send?: (input: PushInput, dryRun?: boolean) => Promise<PushResult>;
     verify?: () => Promise<void>;
+    targetJobId?: string;
+    requireSingleInstallation?: boolean;
   } = {},
 ): Promise<{ claimed: number; completed: number; retried: number; failed: number }> {
   if (!dependencies.store) {
-    if (process.env["FCM_DELIVERY_MODE"] !== "live")
+    if (!dependencies.targetJobId && process.env["FCM_DELIVERY_MODE"] !== "live")
       return { claimed: 0, completed: 0, retried: 0, failed: 0 };
     await (dependencies.verify ?? verifyFcmAdminAuthentication)();
   }
   const store = dependencies.store ?? supabaseStore();
   const send = dependencies.send ?? sendGuardianNotification;
-  const jobs = await store.claim(limit);
+  const jobs = dependencies.targetJobId
+    ? await (store.claimSpecific?.(dependencies.targetJobId) ??
+        Promise.reject(new Error("Specific claim unavailable")))
+    : await store.claim(limit);
   const summary = { claimed: jobs.length, completed: 0, retried: 0, failed: 0 };
   for (const job of jobs) {
     try {
@@ -228,7 +216,11 @@ export async function processPushJobs(
         summary.completed++;
         continue;
       }
-      const message = payload(loaded);
+      if (dependencies.requireSingleInstallation && loaded.installations.length !== 1) {
+        await store.complete(job, true);
+        throw new Error("Controlled push requires exactly one eligible installation");
+      }
+      const message = renderPushPayload(loaded);
       for (const installation of loaded.installations) {
         const fence = await store.begin(job, installation);
         if (fence === "lease_lost") throw new Error("Push job lease lost");

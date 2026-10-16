@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { AppShell } from "@/components/layout/app-shell";
@@ -15,6 +15,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/components/auth/auth-context";
 import type { AuthUser } from "@/lib/types";
 import { getPublicRoutes, isRouteAllowed } from "@/lib/route-auth";
+import { currentPolicies } from "@/lib/policy-acceptance";
+import { hasDatabaseConnection } from "@/lib/db/connection";
 
 function NotFoundComponent() {
   return (
@@ -38,10 +40,11 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  const configurationError = /VITE_SUPABASE_URL|VITE_SUPABASE_ANON_KEY/.test(error.message);
+  const configurationError =
+    error instanceof Error && /VITE_SUPABASE_URL|VITE_SUPABASE_ANON_KEY/.test(error.message);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -149,6 +152,27 @@ function AuthWrapper() {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+  const [policyState, setPolicyState] = useState<"checking" | "accepted" | "required">("checking");
+
+  useEffect(() => {
+    if (!user || !hasDatabaseConnection()) {
+      setPolicyState("accepted");
+      return;
+    }
+    let active = true;
+    setPolicyState("checking");
+    void currentPolicies()
+      .then((records) => {
+        if (active)
+          setPolicyState(records.every((record) => record.accepted) ? "accepted" : "required");
+      })
+      .catch(() => {
+        if (active) setPolicyState("required");
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   // Keep router context in sync with auth state
   useEffect(() => {
@@ -158,6 +182,15 @@ function AuthWrapper() {
   // Centralized route guard logic using the shared route-auth config
   useEffect(() => {
     if (isLoading) return;
+
+    if (
+      user &&
+      policyState === "required" &&
+      !["/privacy", "/terms", "/policy-consent", "/create-account"].includes(pathname)
+    ) {
+      void router.navigate({ to: "/policy-consent", replace: true });
+      return;
+    }
 
     if (!user && !isPublicRoute) {
       // Unauthenticated → redirect to login
@@ -173,7 +206,7 @@ function AuthWrapper() {
       // Role not allowed for this route → redirect to home
       void router.navigate({ to: "/", replace: true });
     }
-  }, [user, isLoading, pathname, isPublicRoute, router]);
+  }, [user, isLoading, pathname, isPublicRoute, router, policyState]);
 
   if (isLoading) {
     return (
@@ -192,6 +225,12 @@ function AuthWrapper() {
   if (user && pathname === "/login") {
     return null;
   }
+  if (
+    user &&
+    !["/privacy", "/terms", "/policy-consent", "/create-account"].includes(pathname) &&
+    policyState !== "accepted"
+  )
+    return null;
 
   // Block rendering if the user's role is not allowed for this route
   if (user && !isRouteAllowed(pathname, user.role)) {

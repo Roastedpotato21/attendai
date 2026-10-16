@@ -21,9 +21,32 @@ const contentTypes = {
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8",
   ".webp": "image/webp",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".woff": "font/woff",
   ".woff2": "font/woff2",
 };
+
+// Match the static header rules used by the Cloudflare production build.
+const headerRules = [];
+let currentRule;
+for (const line of (await readFile(resolve(publicDir, "_headers"), "utf8").catch(() => "")).split(
+  /\r?\n/,
+)) {
+  if (!line.trim() || line.trimStart().startsWith("#")) continue;
+  if (!/^\s/.test(line)) {
+    const pattern = line
+      .trim()
+      .split("*")
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join(".*");
+    currentRule = { pattern: new RegExp(`^${pattern}$`), headers: {} };
+    headerRules.push(currentRule);
+  } else if (currentRule) {
+    const separator = line.indexOf(":");
+    if (separator > 0)
+      currentRule.headers[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+  }
+}
 
 const workerModule = await import(pathToFileURL(workerPath).href);
 const worker = workerModule.default;
@@ -35,6 +58,7 @@ if (!worker || typeof worker.fetch !== "function") {
 async function serveAsset(request) {
   const url = new URL(request.url);
   const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+  if (relativePath === "_headers") return new Response("Not found", { status: 404 });
   const assetPath = resolve(publicDir, relativePath);
 
   if (assetPath !== publicDir && !assetPath.startsWith(`${publicDir}${sep}`)) {
@@ -50,6 +74,12 @@ async function serveAsset(request) {
         "content-length": String(fileStats.size),
         "content-type":
           contentTypes[extname(assetPath).toLowerCase()] ?? "application/octet-stream",
+        ...Object.assign(
+          {},
+          ...headerRules
+            .filter((rule) => rule.pattern.test(url.pathname))
+            .map((rule) => rule.headers),
+        ),
       },
     });
   } catch {

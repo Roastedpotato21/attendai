@@ -25,12 +25,15 @@ import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as InterventionsRouteImport } from './routes/interventions'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
+import { Route as PolicyConsentRouteImport } from './routes/policy-consent'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudentDashboardRouteImport } from './routes/student-dashboard'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as TemplatesRouteImport } from './routes/templates'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as VoiceCallsRouteImport } from './routes/voice-calls'
 
 const IndexRoute = IndexRouteImport.update({
@@ -113,6 +116,16 @@ const MessagesRoute = MessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PolicyConsentRoute = PolicyConsentRouteImport.update({
+  id: '/policy-consent',
+  path: '/policy-consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -143,6 +156,11 @@ const TemplatesRoute = TemplatesRouteImport.update({
   path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VoiceCallsRoute = VoiceCallsRouteImport.update({
   id: '/voice-calls',
   path: '/voice-calls',
@@ -166,12 +184,15 @@ export interface FileRoutesByFullPath {
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
+  '/policy-consent': typeof PolicyConsentRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
   '/student-dashboard': typeof StudentDashboardRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
+  '/terms': typeof TermsRoute
   '/voice-calls': typeof VoiceCallsRoute
 }
 export interface FileRoutesByTo {
@@ -191,12 +212,15 @@ export interface FileRoutesByTo {
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
+  '/policy-consent': typeof PolicyConsentRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
   '/student-dashboard': typeof StudentDashboardRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
+  '/terms': typeof TermsRoute
   '/voice-calls': typeof VoiceCallsRoute
 }
 export interface FileRoutesById {
@@ -217,12 +241,15 @@ export interface FileRoutesById {
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
+  '/policy-consent': typeof PolicyConsentRoute
+  '/privacy': typeof PrivacyRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
   '/student-dashboard': typeof StudentDashboardRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
+  '/terms': typeof TermsRoute
   '/voice-calls': typeof VoiceCallsRoute
 }
 export interface FileRouteTypes {
@@ -244,12 +271,15 @@ export interface FileRouteTypes {
     | '/interventions'
     | '/login'
     | '/messages'
+    | '/policy-consent'
+    | '/privacy'
     | '/reports'
     | '/roles'
     | '/settings'
     | '/student-dashboard'
     | '/students'
     | '/templates'
+    | '/terms'
     | '/voice-calls'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -269,12 +299,15 @@ export interface FileRouteTypes {
     | '/interventions'
     | '/login'
     | '/messages'
+    | '/policy-consent'
+    | '/privacy'
     | '/reports'
     | '/roles'
     | '/settings'
     | '/student-dashboard'
     | '/students'
     | '/templates'
+    | '/terms'
     | '/voice-calls'
   id:
     | '__root__'
@@ -294,12 +327,15 @@ export interface FileRouteTypes {
     | '/interventions'
     | '/login'
     | '/messages'
+    | '/policy-consent'
+    | '/privacy'
     | '/reports'
     | '/roles'
     | '/settings'
     | '/student-dashboard'
     | '/students'
     | '/templates'
+    | '/terms'
     | '/voice-calls'
   fileRoutesById: FileRoutesById
 }
@@ -320,12 +356,15 @@ export interface RootRouteChildren {
   InterventionsRoute: typeof InterventionsRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
+  PolicyConsentRoute: typeof PolicyConsentRoute
+  PrivacyRoute: typeof PrivacyRoute
   ReportsRoute: typeof ReportsRoute
   RolesRoute: typeof RolesRoute
   SettingsRoute: typeof SettingsRoute
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentsRoute: typeof StudentsRoute
   TemplatesRoute: typeof TemplatesRoute
+  TermsRoute: typeof TermsRoute
   VoiceCallsRoute: typeof VoiceCallsRoute
 }
 
@@ -443,6 +482,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/policy-consent': {
+      id: '/policy-consent'
+      path: '/policy-consent'
+      fullPath: '/policy-consent'
+      preLoaderRoute: typeof PolicyConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -485,6 +538,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/voice-calls': {
       id: '/voice-calls'
       path: '/voice-calls'
@@ -512,12 +572,15 @@ const rootRouteChildren: RootRouteChildren = {
   InterventionsRoute: InterventionsRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
+  PolicyConsentRoute: PolicyConsentRoute,
+  PrivacyRoute: PrivacyRoute,
   ReportsRoute: ReportsRoute,
   RolesRoute: RolesRoute,
   SettingsRoute: SettingsRoute,
   StudentDashboardRoute: StudentDashboardRoute,
   StudentsRoute: StudentsRoute,
   TemplatesRoute: TemplatesRoute,
+  TermsRoute: TermsRoute,
   VoiceCallsRoute: VoiceCallsRoute,
 }
 export const routeTree = rootRouteImport
