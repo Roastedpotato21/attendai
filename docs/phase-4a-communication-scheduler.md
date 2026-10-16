@@ -1,5 +1,10 @@
 # Phase 4A communication scheduler
 
+The current SMS-primary routing and deployment state supersede this original
+handoff; see [SMS primary recovery](sms-primary-recovery.md). In particular,
+SMS and FCM now run independently, and the current Twilio product-trial SMS
+path does not support the controlled +91 destination.
+
 ## Runtime and scheduler
 
 AttendAI builds as a TanStack Start application through Nitro's

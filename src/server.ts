@@ -3,6 +3,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleCommunicationWorkerRequest } from "./lib/server/communication-worker-endpoint";
 import { handleTwilioStatusWebhook } from "./lib/server/communication-webhooks";
+import { handleFast2SmsRequest } from "./lib/server/fast2sms-endpoint";
 import {
   handleGuardianNotificationAdmin,
   handleGuardianNotificationDevice,
@@ -56,6 +57,9 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (new URL(request.url).pathname.startsWith("/api/internal/communications/fast2sms/")) {
+        return handleFast2SmsRequest(request);
+      }
       if (new URL(request.url).pathname === "/api/internal/communications/process") {
         return handleCommunicationWorkerRequest(request);
       }

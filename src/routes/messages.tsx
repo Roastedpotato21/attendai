@@ -56,7 +56,7 @@ function MessagesPage() {
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title="Guardian messages"
-        description="Push acceptance and historical messaging records."
+        description="SMS absence alerts, push notifications, and delivery history."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -66,7 +66,7 @@ function MessagesPage() {
           icon={<MessageSquare className="h-5 w-5" />}
         />
         <StatCard
-          label="Delivered (legacy)"
+          label="Delivered"
           value={displayCount(delivered)}
           icon={<CheckCheck className="h-5 w-5" />}
         />
@@ -99,9 +99,9 @@ function MessagesPage() {
             <Tabs value={filter} onValueChange={setFilter} className="mb-4">
               <TabsList>
                 <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="WhatsApp">WhatsApp</TabsTrigger>
                 <TabsTrigger value="SMS">SMS</TabsTrigger>
                 <TabsTrigger value="Push">Push</TabsTrigger>
+                <TabsTrigger value="WhatsApp">WhatsApp</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="space-y-2">

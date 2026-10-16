@@ -73,7 +73,7 @@ DO $$ BEGIN
     RAISE EXCEPTION 'correction counts/version/editor are wrong';
   END IF;
   IF (SELECT count(*) FROM public.communication_jobs j JOIN public.communications c ON c.id = j.communication_id
-      WHERE c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state)
+      WHERE c.type = 'push' AND c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state)
         AND j.status = 'cancelled') <> 1 THEN RAISE EXCEPTION 'pending absence was not cancelled'; END IF;
   BEGIN
     PERFORM public.submit_attendance('20000000-0000-4000-8000-000000000001', '2026-09-28', 'manual',
@@ -117,7 +117,7 @@ DO $$ BEGIN
       AND status = 'absent') OR NOT EXISTS (SELECT 1 FROM public.attendance_sessions
       WHERE id = (SELECT id FROM correction_state) AND revision = 1 AND total_present = 2
         AND total_absent = 0 AND total_late = 1) THEN RAISE EXCEPTION 'partial correction survived'; END IF;
-  IF (SELECT count(*) FROM public.communications WHERE metadata->>'attendance_session_id'
+  IF (SELECT count(*) FROM public.communications WHERE type = 'push' AND metadata->>'attendance_session_id'
       = (SELECT id::TEXT FROM correction_state)) <> 1 THEN RAISE EXCEPTION 'partial outbox survived'; END IF;
 END $$;
 RESET ROLE;
@@ -131,9 +131,9 @@ SELECT public.update_attendance((SELECT id FROM correction_state), 1,
 RESET ROLE;
 DO $$ BEGIN
   IF (SELECT count(*) FROM public.communication_jobs j JOIN public.communications c ON c.id = j.communication_id
-      WHERE c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state)) <> 1
+      WHERE c.type = 'push' AND c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state)) <> 1
     OR NOT EXISTS (SELECT 1 FROM public.communication_jobs j JOIN public.communications c ON c.id = j.communication_id
-      WHERE c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state) AND j.status = 'pending') THEN
+      WHERE c.type = 'push' AND c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state) AND j.status = 'pending') THEN
     RAISE EXCEPTION 'restored absence did not reuse its pending job';
   END IF;
 END $$;
@@ -141,9 +141,9 @@ END $$;
 -- Delivered history must survive subsequent correction.
 UPDATE public.communication_jobs SET status = 'completed'
 WHERE communication_id IN (SELECT id FROM public.communications
-  WHERE metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state));
+  WHERE type = 'push' AND metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state));
 UPDATE public.communications SET provider_message_id = 'test-delivered-correction', message_status = 'delivered'
-WHERE metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state);
+WHERE type = 'push' AND metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state);
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000056', true);
 SELECT public.update_attendance((SELECT id FROM correction_state), 2,
@@ -157,10 +157,10 @@ END $$;
 SELECT public.update_attendance((SELECT id FROM correction_state), 3,
   '[{"student_id":"10000000-0000-4000-8000-000000000001","status":"absent"}]');
 DO $$ BEGIN
-  IF (SELECT count(*) FROM public.communications WHERE metadata->>'attendance_session_id'
+  IF (SELECT count(*) FROM public.communications WHERE type = 'push' AND metadata->>'attendance_session_id'
       = (SELECT id::TEXT FROM correction_state)) <> 2 OR NOT EXISTS (
       SELECT 1 FROM public.communication_jobs j JOIN public.communications c ON c.id = j.communication_id
-      WHERE c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state)
+      WHERE c.type = 'push' AND c.metadata->>'attendance_session_id' = (SELECT id::TEXT FROM correction_state)
         AND c.student_id = '10000000-0000-4000-8000-000000000001' AND j.status = 'pending') THEN
     RAISE EXCEPTION 'new correction absence did not enqueue exactly one pending job';
   END IF;

@@ -211,11 +211,7 @@ export async function processPushJobs(
   } = {},
 ): Promise<{ claimed: number; completed: number; retried: number; failed: number }> {
   if (!dependencies.store) {
-    if (
-      process.env["NOTIFICATION_PROVIDER"] !== "fcm" ||
-      process.env["FCM_DELIVERY_MODE"] !== "live" ||
-      process.env["SMS_DELIVERY_MODE"] !== "disabled"
-    )
+    if (process.env["FCM_DELIVERY_MODE"] !== "live")
       return { claimed: 0, completed: 0, retried: 0, failed: 0 };
     await (dependencies.verify ?? verifyFcmAdminAuthentication)();
   }

@@ -6,6 +6,34 @@ import { workerAuthorized } from "./worker-auth.ts";
 const DEFAULT_BATCH_SIZE = 20;
 const MAX_BATCH_SIZE = 50;
 
+type Counts = { claimed: number; completed: number; retried: number; failed: number };
+
+/** SMS starts first; each channel runs and records errors independently. */
+export async function processNotificationChannels(
+  limit: number,
+  sms: (limit: number) => Promise<Counts> = processCommunicationJobs,
+  push: (limit: number) => Promise<Counts> = async (size) =>
+    (await import("./push-worker.ts")).processPushJobs(size),
+): Promise<Counts> {
+  const results = await Promise.allSettled([
+    Promise.resolve().then(() => sms(limit)),
+    Promise.resolve().then(() => push(limit)),
+  ]);
+  const summary = { claimed: 0, completed: 0, retried: 0, failed: 0 };
+  for (const [index, result] of results.entries()) {
+    if (result.status === "rejected") {
+      console.error("[communication-worker] channel unavailable", {
+        channel: index === 0 ? "sms" : "push",
+      });
+      summary.failed++;
+    } else {
+      for (const key of ["claimed", "completed", "retried", "failed"] as const)
+        summary[key] += result.value[key];
+    }
+  }
+  return summary;
+}
+
 export type WorkerRunSummary = {
   runId: string;
   claimed: number;
@@ -40,11 +68,7 @@ export async function handleCommunicationWorkerRequest(
   const runId = options.runId ?? randomUUID();
   const started = Date.now();
   try {
-    const processor =
-      options.processJobs ??
-      (process.env["NOTIFICATION_PROVIDER"] === "fcm"
-        ? (await import("./push-worker.ts")).processPushJobs
-        : processCommunicationJobs);
+    const processor = options.processJobs ?? processNotificationChannels;
     const result = await processor(options.batchSize ?? communicationWorkerBatchSize());
     const summary: WorkerRunSummary = { runId, ...result, durationMs: Date.now() - started };
     console.info("[communication-worker] run complete", summary);

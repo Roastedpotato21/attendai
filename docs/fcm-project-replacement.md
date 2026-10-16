@@ -1,5 +1,9 @@
 # Firebase FCM project replacement
 
+SMS is now the primary absence channel and FCM remains independent. See
+[SMS primary recovery](sms-primary-recovery.md) for the newer routing,
+deployment, and test state. This document records the preceding FCM work.
+
 Target project: `attendai-41f64` (number `849652695985`). The Firebase
 integration confirmed this project is active and its `attendai-web` app ID is
 `1:849652695985:web:8b73aa6ecf97a2f313f390`. Its public Web SDK config

@@ -210,7 +210,9 @@ module.exports = async function verifySmsFlow(client) {
     const store = smsStore(client);
     const deliverJob = async (...args) => {
       providerCalls++;
-      return deliver(...args);
+      const result = await deliver(...args);
+      // Preserve the pre-migration Twilio callback regression with a historical fixture.
+      return result.ok ? { ...result, provider: "twilio-simulated" } : result;
     };
     const run = await processCommunicationJobs(1, { store, deliverJob });
     assert.equal(run.completed, 1);
@@ -350,13 +352,19 @@ module.exports = async function verifySmsFlow(client) {
     );
     assert.equal(limited.rows[0].total, 0, "rate limit must block another outbox job");
 
+    // The stronger dispatch fence requires a real, recent, still-absent event.
+    // This entire suite runs against disposable PostgreSQL, never live data.
+    await client.query("UPDATE public.attendance_sessions SET date=CURRENT_DATE-7 WHERE id=$1", [
+      sessionId,
+    ]);
     const uncertain = await client.query(
       `WITH c AS (
       INSERT INTO public.communications (institution_id, student_id, parent_id, type, message_status, metadata)
-      VALUES ($1, $2, $3, 'sms', 'queued', '{"purpose":"absence-alert"}'::jsonb) RETURNING id
+      VALUES ($1, $2, $3, 'sms', 'queued', jsonb_build_object('purpose','absence-alert',
+        'attendance_session_id',$4::text)) RETURNING id
     ) INSERT INTO public.communication_jobs (institution_id, communication_id, channel, idempotency_key)
       SELECT $1, c.id, 'sms', 'sms-uncertain-test' FROM c RETURNING id`,
-      [institutionId, studentId, parentId],
+      [institutionId, studentId, parentId, sessionId],
     );
     const claimed = await client.query(
       "SELECT id, lease_owner FROM public.claim_communication_jobs(1)",

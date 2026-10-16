@@ -5,6 +5,8 @@
  * protected scheduler). It intentionally uses non-VITE environment variables
  * and is never imported by a browser route.
  */
+import { Fast2SmsProvider } from "./fast2sms-provider.ts";
+import { TwilioProvider, type SmsDelivery } from "./sms-provider.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { channel } from "node:diagnostics_channel";
 import { createClient } from "@supabase/supabase-js";
@@ -23,22 +25,10 @@ type Job = {
   lease_owner: string;
 };
 
-type Delivery =
-  | {
-      ok: true;
-      provider: string;
-      providerId: string;
-      status: "queued" | "sent" | "failed" | "undelivered";
-      body?: string;
-      templateId?: string;
-      recipient?: string;
-    }
-  | { ok: false; errorClass: "transient" | "permanent" | "ambiguous"; message: string };
+type Delivery = SmsDelivery;
 
 type Communication = Record<string, unknown>;
 
-// Twilio's SMS trial accepts this identifier as Body, not custom message text.
-const TWILIO_TRIAL_SMS_BODY = "sms_appointment_reminders";
 const TWILIO_API_HOST = "api.twilio.com";
 const TWILIO_REQUEST_TIMEOUT_MS = 20_000;
 
@@ -129,13 +119,20 @@ export type CommunicationWorkerStore = {
     institutionName?: string | undefined;
     template?: SmsTemplate | undefined;
   } | null>;
-  beginDispatch?: (job: Job) => Promise<boolean>;
+  beginDispatch?: (
+    job: Job,
+    body: string,
+    templateId: string,
+    recipient: string,
+  ) => Promise<boolean>;
   finish: (job: Job, result: Delivery) => Promise<boolean>;
 };
 
 export type CommunicationWorkerDependencies = {
   store?: CommunicationWorkerStore;
   deliverJob?: typeof deliver;
+  trialJobId?: string;
+  authorizedLiveTrial?: boolean;
 };
 
 const requireEnv = (key: string): string => {
@@ -150,11 +147,13 @@ function serverDb() {
   });
 }
 
-function supabaseStore(): CommunicationWorkerStore {
+function supabaseStore(trialJobId?: string): CommunicationWorkerStore {
   const db = serverDb();
   return {
     async claim(limit) {
-      const { data, error } = await db.rpc("claim_communication_jobs", { p_limit: limit });
+      const { data, error } = trialJobId
+        ? await db.rpc("claim_sms_trial_job", { p_job: trialJobId })
+        : await db.rpc("claim_communication_jobs", { p_limit: limit });
       if (error) throw new Error(`claim communication jobs: ${error.message}`);
       return (data ?? []) as Job[];
     },
@@ -241,10 +240,13 @@ function supabaseStore(): CommunicationWorkerStore {
         template,
       };
     },
-    async beginDispatch(job) {
-      const { data, error } = await db.rpc("mark_sms_dispatch_started", {
+    async beginDispatch(job, body, templateId, recipient) {
+      const { data, error } = await db.rpc("begin_sms_dispatch", {
         p_job: job.id,
         p_owner: job.lease_owner,
+        p_body: body,
+        p_template: templateId,
+        p_recipient: recipient,
       });
       if (error) throw new Error("Unable to fence SMS dispatch");
       return data === true;
@@ -299,12 +301,15 @@ async function twilioRequest(path: string, parameters: Record<string, string>): 
       sid?: string;
       status?: string;
       code?: number | string;
+      message?: string;
     };
     if (!response.ok) {
       // Only an explicit 429 proves that Twilio rejected the request before
       // accepting a message. A timeout, 408 or 5xx has an uncertain outcome.
       return {
         ok: false,
+        httpStatus: response.status,
+        ...(payload.code === undefined ? {} : { providerCode: String(payload.code) }),
         errorClass:
           response.status === 429
             ? "transient"
@@ -316,7 +321,15 @@ async function twilioRequest(path: string, parameters: Record<string, string>): 
           response.status +
           " (" +
           twilioFailureDetails(started, trace, { status: response.status, code: payload.code }) +
-          ")",
+          ")" +
+          (payload.message
+            ? ": " +
+              payload.message
+                .replace(/\+\d{8,15}/g, "[recipient]")
+                .replace(/\b(?:AC|SK)[a-fA-F0-9]{32}\b/g, "[account]")
+                .replace(/[\r\n]/g, " ")
+                .slice(0, 400)
+            : ""),
       };
     }
     if (!payload.sid || !payload.sid.startsWith("SM")) {
@@ -365,6 +378,8 @@ export async function deliver(
   parent: Record<string, unknown>,
   template?: SmsTemplate,
   institutionName?: string,
+  beforeSend?: (body: string, templateId: string, recipient: string) => Promise<boolean>,
+  options: { liveTrial?: boolean } = {},
 ): Promise<Delivery> {
   if (!parent["communication_consent"] || !parent["active"])
     return { ok: false, errorClass: "permanent", message: "parent is not eligible" };
@@ -383,7 +398,7 @@ export async function deliver(
 
     if (job.channel === "sms") {
       // A configured Twilio token never implicitly enables paid delivery.
-      const mode = process.env["SMS_DELIVERY_MODE"];
+      const mode = options.liveTrial ? "live" : process.env["SMS_DELIVERY_MODE"];
       if (mode !== "live" && mode !== "simulate")
         return { ok: false, errorClass: "permanent", message: "SMS delivery is disabled" };
       if (
@@ -412,7 +427,7 @@ export async function deliver(
       if (mode === "simulate") {
         return {
           ok: true,
-          provider: "twilio-simulated",
+          provider: "fast2sms-simulated",
           providerId: "SMsimulated" + crypto.randomUUID().replace(/-/g, ""),
           status: "queued",
           body,
@@ -429,29 +444,23 @@ export async function deliver(
           errorClass: "permanent",
           message: "recipient is not authorized for live SMS",
         };
-      const trial = process.env["TWILIO_TRIAL_MODE"] === "true";
-      if (recipient.startsWith("+91") && !trial && process.env["SMS_INDIA_DLT_READY"] !== "true")
+      const selected = process.env["SMS_PROVIDER"] ?? "fast2sms";
+      const provider = selected === "fast2sms" ? new Fast2SmsProvider() : new TwilioProvider();
+      const invalid =
+        selected !== "fast2sms" ? "Twilio is disabled for new SMS" : provider.validate(recipient);
+      if (invalid) return { ok: false, errorClass: "permanent", message: invalid };
+      if (!beforeSend || !(await beforeSend(body, template.id, recipient)))
         return {
           ok: false,
           errorClass: "permanent",
-          message: "India SMS registration is not verified",
+          message: "SMS dispatch is not authorized by the database fence",
         };
-      const callback = new URL(requireEnv("TWILIO_WEBHOOK_PUBLIC_URL"));
-      if (callback.protocol !== "https:" || !communication["id"])
-        return { ok: false, errorClass: "permanent", message: "SMS callback URL is invalid" };
-      callback.searchParams.set("communication_id", String(communication["id"]));
-      const providerBody = trial ? TWILIO_TRIAL_SMS_BODY : body;
-      const parameters = {
-        To: recipient,
-        StatusCallback: callback.toString(),
-        Body: providerBody,
-        ...(trial ? {} : { From: requireEnv("TWILIO_PHONE_NUMBER") }),
-      };
-      const result = await twilioRequest("Messages.json", parameters);
-      // Store the actual API Body. The template ID retains the intended AttendAI message.
-      return result.ok
-        ? { ...result, body: providerBody, templateId: template.id, recipient }
-        : result;
+      const result = await provider.send({
+        recipient,
+        body,
+        communicationId: String(communication["id"]),
+      });
+      return result.ok ? { ...result, body, templateId: template.id, recipient } : result;
     }
     if (job.channel === "whatsapp") {
       const contentSid = process.env[`TWILIO_WHATSAPP_CONTENT_SID_${language.toUpperCase()}`];
@@ -491,7 +500,20 @@ export async function processCommunicationJobs(
   limit = 20,
   dependencies: CommunicationWorkerDependencies = {},
 ): Promise<{ claimed: number; completed: number; retried: number; failed: number }> {
-  const store = dependencies.store ?? supabaseStore();
+  const store = dependencies.store ?? supabaseStore(dependencies.trialJobId);
+  if (
+    !dependencies.store &&
+    process.env["SMS_CONTROLLED_ONLY"] === "true" &&
+    !dependencies.trialJobId
+  )
+    return { claimed: 0, completed: 0, retried: 0, failed: 0 };
+  // A disabled channel must leave pending jobs untouched for later processing.
+  if (
+    !dependencies.store &&
+    !(dependencies.trialJobId && dependencies.authorizedLiveTrial) &&
+    !["live", "simulate"].includes(process.env["SMS_DELIVERY_MODE"] ?? "")
+  )
+    return { claimed: 0, completed: 0, retried: 0, failed: 0 };
   const deliverJob = dependencies.deliverJob ?? deliver;
   const jobs = await store.claim(limit);
   const summary = { claimed: jobs.length, completed: 0, retried: 0, failed: 0 };
@@ -514,21 +536,24 @@ export async function processCommunicationJobs(
                 message: "communication is missing or no longer eligible",
               }
             : await (async () => {
-                if (
-                  job.channel === "sms" &&
-                  process.env["SMS_DELIVERY_MODE"] === "live" &&
-                  deliverJob === deliver
-                ) {
-                  if (!store.beginDispatch || !(await store.beginDispatch(job))) {
-                    throw new Error("SMS dispatch could not be fenced before provider request");
-                  }
-                }
                 return deliverJob(
                   job,
                   { ...loaded.communication, student_name: loaded.student["name"] },
                   loaded.parent,
                   loaded.template,
                   loaded.institutionName,
+                  async (body, templateId, recipient) =>
+                    Boolean(
+                      store.beginDispatch &&
+                      (await store.beginDispatch(job, body, templateId, recipient)),
+                    ),
+                  {
+                    liveTrial:
+                      dependencies.authorizedLiveTrial === true &&
+                      job.id === dependencies.trialJobId &&
+                      job.max_attempts === 1 &&
+                      job.attempts === 1,
+                  },
                 );
               })();
 

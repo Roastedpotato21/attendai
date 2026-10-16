@@ -3,7 +3,7 @@ import { createHmac } from "node:crypto";
 import { channel } from "node:diagnostics_channel";
 import { test } from "node:test";
 import {
-  deliver,
+  deliver as deliverWithFence,
   normalizePhone,
   normalizeSmsPhone,
   processCommunicationJobs,
@@ -11,6 +11,7 @@ import {
 import {
   communicationWorkerBatchSize,
   handleCommunicationWorkerRequest,
+  processNotificationChannels,
 } from "../src/lib/server/communication-worker-endpoint.ts";
 import { runCommunicationSchedule } from "../src/lib/server/communication-scheduler.ts";
 import { verifyTwilioSignature } from "../src/lib/server/communication-webhooks.ts";
@@ -22,6 +23,9 @@ import {
   verifyFcmAdminAuthentication,
 } from "../src/lib/server/fcm-provider.ts";
 import { getTwilioProvider } from "../src/lib/services/twilio-provider.ts";
+// Unit provider tests explicitly simulate an approved database dispatch fence.
+const deliver = (job, communication, parent, template, institutionName) =>
+  deliverWithFence(job, communication, parent, template, institutionName, async () => true);
 import { workerAuthorized } from "../src/lib/server/worker-auth.ts";
 import {
   attendanceConversationSchema,
@@ -31,6 +35,8 @@ import {
 
 // Never load .env. All provider traffic is replaced here, including AI traffic.
 Object.assign(process.env, {
+  FAST2SMS_API_KEY: "test-only-fast2sms",
+  SMS_PROVIDER: "fast2sms",
   TWILIO_ACCOUNT_SID: "ACtest",
   TWILIO_AUTH_TOKEN: "test-only",
   TWILIO_PHONE_NUMBER: "+15005550006",
@@ -77,7 +83,7 @@ const communication = {
   metadata: { purpose: "absence-alert", attendance_date: "2099-01-01" },
 };
 let calls = [];
-let response = () => new Response(JSON.stringify({ sid: "SMtest", status: "queued" }));
+let response = () => new Response(JSON.stringify({ return: true, request_id: "fast-test" }));
 globalThis.fetch = async (url, options) => {
   calls.push({ url, options });
   return response();
@@ -98,100 +104,30 @@ test("SMS uses E.164 and the active institution/language template", async () => 
       "Northstar",
     );
     assert.equal(result.ok, true);
-    assert.equal(result.provider, "twilio");
-    assert.equal(result.providerId, "SMtest");
+    assert.equal(result.provider, "fast2sms");
+    assert.equal(result.providerId, "fast-test");
     assert.equal(result.status, "queued");
-    const form = new URLSearchParams(calls.at(-1).options.body);
-    assert.equal(form.get("To"), "+919876543210");
-    assert.equal(form.get("From"), "+15005550006");
-    assert.ok(form.get("Body").startsWith(localized[language]));
-    assert.ok(form.get("Body").includes("Student 2099-01-01 Northstar"));
-    assert.equal(form.get("Body"), result.body);
-    assert.equal(
-      form.get("StatusCallback"),
-      process.env.TWILIO_WEBHOOK_PUBLIC_URL + "?communication_id=" + communication.id,
-    );
+    const form = JSON.parse(calls.at(-1).options.body);
+    assert.equal(calls.at(-1).url, "https://www.fast2sms.com/dev/bulkV2");
+    assert.equal(form.numbers, "9876543210");
+    assert.equal(form.route, "q");
+    assert.equal(form.udf1, communication.id);
+    assert.ok(form.message.startsWith(localized[language]));
+    assert.ok(form.message.includes("Student 2099-01-01 Northstar"));
+    assert.equal(form.message, result.body);
   }
 });
 
-test("trial SMS uses Twilio's fixed Body identifier without bypassing delivery gates", async () => {
-  const originalMode = process.env.SMS_DELIVERY_MODE;
-  const originalAllowlist = process.env.SMS_LIVE_RECIPIENT_ALLOWLIST;
-  const originalTrial = process.env.TWILIO_TRIAL_MODE;
+test("Twilio cannot be selected for new SMS", async () => {
+  const before = calls.length;
+  process.env.SMS_PROVIDER = "twilio";
   try {
-    process.env.TWILIO_TRIAL_MODE = "true";
-    const before = calls.length;
     const result = await deliver(job, communication, parent, templateFor("en"), "Northstar");
-    assert.equal(calls.length, before + 1);
-    assert.equal(result.ok, true);
-    assert.equal(result.provider, "twilio");
-    assert.equal(result.body, "sms_appointment_reminders");
-    assert.equal(result.templateId, templateFor("en").id);
-    const form = new URLSearchParams(calls.at(-1).options.body);
-    assert.deepEqual([...form.keys()].sort(), ["Body", "StatusCallback", "To"]);
-    assert.equal(form.get("Body"), "sms_appointment_reminders");
-    assert.equal(form.get("To"), "+919876543210");
-    assert.equal(
-      form.get("StatusCallback"),
-      process.env.TWILIO_WEBHOOK_PUBLIC_URL + "?communication_id=" + communication.id,
-    );
-
-    process.env.SMS_LIVE_RECIPIENT_ALLOWLIST = "";
-    assert.equal(
-      (await deliver(job, communication, parent, templateFor("en"), "Northstar")).message,
-      "recipient is not authorized for live SMS",
-    );
-    process.env.SMS_LIVE_RECIPIENT_ALLOWLIST = "+919876543210";
-    process.env.SMS_DELIVERY_MODE = "disabled";
-    assert.equal(
-      (await deliver(job, communication, parent, templateFor("en"), "Northstar")).message,
-      "SMS delivery is disabled",
-    );
-    assert.equal(calls.length, before + 1);
+    assert.equal(result.ok, false);
+    assert.match(result.message, /Twilio is disabled/);
+    assert.equal(calls.length, before);
   } finally {
-    process.env.SMS_DELIVERY_MODE = originalMode;
-    process.env.SMS_LIVE_RECIPIENT_ALLOWLIST = originalAllowlist;
-    process.env.TWILIO_TRIAL_MODE = originalTrial;
-  }
-});
-
-test("India DLT readiness gates production SMS but not the allowlisted trial template", async () => {
-  const originalTrial = process.env.TWILIO_TRIAL_MODE;
-  const originalDlt = process.env.SMS_INDIA_DLT_READY;
-  const originalAllowlist = process.env.SMS_LIVE_RECIPIENT_ALLOWLIST;
-  try {
-    process.env.TWILIO_TRIAL_MODE = "true";
-    process.env.SMS_INDIA_DLT_READY = "false";
-    const before = calls.length;
-    const trial = await deliver(job, communication, parent, templateFor("en"), "Northstar");
-    assert.equal(trial.ok, true);
-    assert.equal(calls.length, before + 1);
-    assert.equal(
-      new URLSearchParams(calls.at(-1).options.body).get("Body"),
-      "sms_appointment_reminders",
-    );
-
-    process.env.TWILIO_TRIAL_MODE = "false";
-    const blocked = await deliver(job, communication, parent, templateFor("en"), "Northstar");
-    assert.equal(blocked.message, "India SMS registration is not verified");
-    assert.equal(calls.length, before + 1);
-
-    process.env.SMS_INDIA_DLT_READY = "true";
-    const production = await deliver(job, communication, parent, templateFor("en"), "Northstar");
-    assert.equal(production.ok, true);
-    assert.equal(calls.length, before + 2);
-    assert.match(new URLSearchParams(calls.at(-1).options.body).get("Body"), /^English /);
-
-    process.env.TWILIO_TRIAL_MODE = "true";
-    process.env.SMS_INDIA_DLT_READY = "false";
-    process.env.SMS_LIVE_RECIPIENT_ALLOWLIST = "";
-    const unlisted = await deliver(job, communication, parent, templateFor("en"), "Northstar");
-    assert.equal(unlisted.message, "recipient is not authorized for live SMS");
-    assert.equal(calls.length, before + 2);
-  } finally {
-    process.env.TWILIO_TRIAL_MODE = originalTrial;
-    process.env.SMS_INDIA_DLT_READY = originalDlt;
-    process.env.SMS_LIVE_RECIPIENT_ALLOWLIST = originalAllowlist;
+    process.env.SMS_PROVIDER = "fast2sms";
   }
 });
 
@@ -221,7 +157,7 @@ test("SMS defaults off, requires a live allowlist, and selects English only as f
       "Northstar",
     );
     assert.equal(fallback.ok, true);
-    assert.equal(fallback.provider, "twilio-simulated");
+    assert.equal(fallback.provider, "fast2sms-simulated");
     assert.match(fallback.body, /^English /);
     assert.equal(calls.length, before);
     assert.equal(
@@ -281,14 +217,11 @@ test("SMS template rendering rejects unapproved or missing variables", () => {
   );
 });
 
-test("only explicit 429 is retried; uncertain provider outcomes are not", async () => {
+test("Fast2SMS explicit rejections are terminal; uncertain outcomes are not retried", async () => {
   for (const status of [408, 429, 500, 503, 400, 401, 403, 422]) {
-    response = () => new Response("{}", { status });
+    response = () => Response.json({ return: false, message: "Rejected" }, { status });
     const result = await deliver(job, communication, parent, templateFor("en"), "Northstar");
-    assert.equal(
-      result.errorClass,
-      status === 429 ? "transient" : status === 408 || status >= 500 ? "ambiguous" : "permanent",
-    );
+    assert.equal(result.errorClass, status === 408 || status >= 500 ? "ambiguous" : "permanent");
   }
   for (const failure of [
     new TypeError("network failure"),
@@ -305,6 +238,7 @@ test("only explicit 429 is retried; uncertain provider outcomes are not", async 
 });
 
 test("provider failure records safe network cause and observed request body writes", async () => {
+  process.env.TWILIO_WHATSAPP_CONTENT_SID_EN = "HXen";
   response = () => {
     const request = {
       origin: "https://api.twilio.com",
@@ -318,7 +252,7 @@ test("provider failure records safe network cause and observed request body writ
       cause: Object.assign(new Error("socket reset"), { code: "ECONNRESET" }),
     });
   };
-  const result = await deliver(job, communication, parent, templateFor("en"), "Northstar");
+  const result = await deliver({ ...job, channel: "whatsapp" }, communication, parent);
   assert.equal(result.ok, false);
   assert.equal(result.errorClass, "ambiguous");
   assert.match(result.message, /endpoint=api\.twilio\.com/);
@@ -331,7 +265,7 @@ test("provider failure records safe network cause and observed request body writ
   response = () => {
     throw new DOMException("timeout with private details", "TimeoutError");
   };
-  const timeout = await deliver(job, communication, parent, templateFor("en"), "Northstar");
+  const timeout = await deliver({ ...job, channel: "whatsapp" }, communication, parent);
   assert.equal(timeout.errorClass, "ambiguous");
   assert.match(timeout.message, /bodyBytesWrittenObserved=unknown/);
   assert.match(timeout.message, /errorName=TimeoutError/);
@@ -872,4 +806,27 @@ test("FCM validation-only request targets the enrolled FID with the exact alert"
       else process.env[key] = previous[key];
     }
   }
+});
+
+test("SMS and push failures are isolated and SMS starts first", async () => {
+  for (const failedChannel of ["sms", "push"]) {
+    const started = [];
+    const channelRun = (name) => async () => {
+      started.push(name);
+      if (name === failedChannel) throw new Error("provider unavailable");
+      return { claimed: 1, completed: 1, retried: 0, failed: 0 };
+    };
+    const result = await processNotificationChannels(1, channelRun("sms"), channelRun("push"));
+    assert.deepEqual(started, ["sms", "push"]);
+    assert.equal(result.completed, 1);
+    assert.equal(result.failed, 1);
+  }
+});
+
+test("live SMS cannot bypass the database dispatch fence", async () => {
+  const before = calls.length;
+  const result = await deliverWithFence(job, communication, parent, templateFor("en"), "Northstar");
+  assert.equal(result.ok, false);
+  assert.match(result.message, /database fence/);
+  assert.equal(calls.length, before);
 });

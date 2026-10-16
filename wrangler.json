@@ -1,6 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "attendai",
+  "vars": {
+    "TWILIO_TRIAL_MODE": "true",
+    "TWILIO_WEBHOOK_PUBLIC_URL": "https://attendai.attendai-expresspotato44.workers.dev/api/webhooks/twilio/status",
+    "SMS_INDIA_DLT_READY": "false",
+    "SMS_PROVIDER": "fast2sms",
+    "SMS_CONTROLLED_ONLY": "true",
+    "SMS_TRIAL_EXECUTION_KEY": "fast2sms-20261012-student-one-oct02-v1"
+  },
   "triggers": {
     "crons": ["* * * * *"]
   }
