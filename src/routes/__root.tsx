@@ -152,6 +152,7 @@ function AuthWrapper() {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+  const isPublicContent = ["/privacy", "/terms", "/guardian-notifications"].includes(pathname);
   const [policyState, setPolicyState] = useState<"checking" | "accepted" | "required">("checking");
 
   useEffect(() => {
@@ -181,7 +182,7 @@ function AuthWrapper() {
 
   // Centralized route guard logic using the shared route-auth config
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isPublicContent) return;
 
     if (
       user &&
@@ -206,7 +207,11 @@ function AuthWrapper() {
       // Role not allowed for this route → redirect to home
       void router.navigate({ to: "/", replace: true });
     }
-  }, [user, isLoading, pathname, isPublicRoute, router, policyState]);
+  }, [user, isLoading, pathname, isPublicRoute, isPublicContent, router, policyState]);
+
+  // These pages are available independently of staff session and policy state.
+  // Rendering them on the server also makes the legal notice readable without JS.
+  if (isPublicContent) return <Outlet />;
 
   if (isLoading) {
     return (

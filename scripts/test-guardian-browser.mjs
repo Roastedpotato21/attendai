@@ -1,4 +1,4 @@
-/** Private browser smoke test. Invitation responses are fixtures; no live enrollment or FCM send. */
+/** Browser smoke test. Invitation responses are fixtures; no live enrollment or FCM send. */
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -9,7 +9,14 @@ import { GUARDIAN_NOTIFICATION_CONSENT_VERSION } from "../src/lib/guardian-conse
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const origin = new URL(process.argv[2] ?? "http://127.0.0.1:4317");
-assert.ok(["127.0.0.1", "localhost"].includes(origin.hostname), "Use a private localhost preview");
+const deploymentSmoke =
+  process.argv.includes("--deployment-smoke") &&
+  origin.protocol === "https:" &&
+  origin.origin === new URL(process.env.ATTENDAI_APP_URL).origin;
+assert.ok(
+  ["127.0.0.1", "localhost"].includes(origin.hostname) || deploymentSmoke,
+  "Use localhost or explicitly select the configured deployment with --deployment-smoke",
+);
 const temporaryRoot = resolve(root, ".tmp");
 await mkdir(temporaryRoot, { recursive: true });
 const profile = await mkdtemp(resolve(temporaryRoot, "guardian-browser-"));
@@ -161,7 +168,12 @@ try {
   ]) {
     const response = await fetch(new URL(path, origin));
     assert.equal(response.status, 200, `${path} renders in the built preview`);
-    assert.ok((await response.text()).includes(title), `${path} includes its policy title`);
+    const policyHtml = await response.text();
+    assert.ok(policyHtml.includes(title), `${path} includes its policy title`);
+    assert.ok(
+      policyHtml.includes("Product draft pending final institutional and legal review."),
+      `${path} states its review status`,
+    );
   }
   const manifestResponse = await fetch(new URL("/guardian-notifications.webmanifest", origin));
   assert.equal(manifestResponse.status, 200);
@@ -375,5 +387,6 @@ try {
     "Cleanup stays inside temporary workspace",
   );
   await rm(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 200 });
-  console.log("Temporary browser profile and invitation fixture removed; private preview stopped.");
+  console.log("Temporary browser profile and invitation fixture removed.");
+  if (preview) console.log("Private preview stopped.");
 }

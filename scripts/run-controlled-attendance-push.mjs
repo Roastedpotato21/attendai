@@ -1,7 +1,11 @@
 /** Exactly one designated guardian, student, device and existing absence. */
 import { createClient } from "@supabase/supabase-js";
 import { processPushJobs, renderPushPayload } from "../src/lib/server/push-worker.ts";
-import { verifyFcmAdminAuthentication } from "../src/lib/server/fcm-provider.ts";
+import {
+  verifyFcmAdminAuthentication,
+  sendGuardianNotification,
+} from "../src/lib/server/fcm-provider.ts";
+import { randomUUID } from "node:crypto";
 import { isFreshAttendanceSession } from "../src/lib/server/attendance-freshness.ts";
 
 const url = process.env.SUPABASE_URL;
@@ -38,7 +42,9 @@ if (matching.length !== 1) throw new Error("Student One relationship is unavaila
 const student = matching[0];
 const { data: devices, error: deviceError } = await db
   .from("guardian_notification_installations")
-  .select("id,active,permission_state,firebase_project_id,revoked_at,last_seen_at")
+  .select(
+    "id,firebase_installation_id,active,permission_state,firebase_project_id,revoked_at,last_seen_at",
+  )
   .eq("institution_id", guardian.institution_id)
   .eq("guardian_id", guardian.id)
   .eq("active", true);
@@ -63,8 +69,8 @@ const suitable = devices.filter(
         consent.consent_version === "2026-10-16.1",
     ),
 );
-if (devices.length !== 1 || suitable.length !== 1)
-  throw new Error("Exactly one active current-project device required");
+if (suitable.length !== 1)
+  throw new Error("Exactly one active consented current-project device required");
 const { data: absences, error: attendanceError } = await db
   .from("attendance_records")
   .select("session_id,status,attendance_sessions!inner(date,status,institution_id,created_at)")
@@ -133,6 +139,18 @@ const privacyResponse = await fetch(new URL("/privacy", process.env.ATTENDAI_APP
 if (!privacyResponse.ok || !(await privacyResponse.text()).includes("2026-10-15.1"))
   throw new Error("Production application update is not deployed; no send attempted");
 await verifyFcmAdminAuthentication();
+const validation = await sendGuardianNotification(
+  {
+    installationId: suitable[0].firebase_installation_id,
+    title: message.title,
+    body: message.body,
+    communicationId: randomUUID(),
+    idempotencyKey: "controlled-attendance-validation-only",
+  },
+  true,
+);
+if (!validation.ok) throw new Error(`FCM validation failed: ${validation.code}; no send attempted`);
+console.log("FCM CONTROLLED PREFLIGHT PASSED");
 if (!isFreshAttendanceSession(candidate.attendance_sessions))
   throw new Error("Attendance is now too old for a safe alert; no send attempted");
 const { data: queued, error: queueError } = await db.rpc("enqueue_existing_absence_push", {

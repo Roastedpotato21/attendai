@@ -1,5 +1,6 @@
 /** FCM outbox worker. The scheduler calls this only with an explicit live gate. */
 import { createClient } from "@supabase/supabase-js";
+import { GUARDIAN_NOTIFICATION_CONSENT_VERSION } from "../guardian-consent.ts";
 import {
   isFreshAttendanceSession,
   type AttendanceSessionFreshness,
@@ -95,13 +96,21 @@ function supabaseStore(): PushWorkerStore {
           .maybeSingle(),
         db
           .from("guardian_notification_installations")
-          .select("id,firebase_installation_id")
+          .select(
+            "id,firebase_installation_id,guardian_notification_consents!inner(status,consent_version,revoked_at)",
+          )
           .eq("institution_id", job.institution_id)
           .eq("guardian_id", communication["parent_id"])
           .eq("active", true)
           .is("revoked_at", null)
           .eq("firebase_project_id", "attendai-41f64")
           .eq("permission_state", "granted")
+          .eq("guardian_notification_consents.status", "accepted")
+          .eq(
+            "guardian_notification_consents.consent_version",
+            GUARDIAN_NOTIFICATION_CONSENT_VERSION,
+          )
+          .is("guardian_notification_consents.revoked_at", null)
           .gte("last_seen_at", new Date(Date.now() - 90 * 86400000).toISOString()),
         db.from("institutions").select("name").eq("id", job.institution_id).maybeSingle(),
       ]);

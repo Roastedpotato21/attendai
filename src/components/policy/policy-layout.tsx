@@ -24,6 +24,9 @@ export function PolicyLayout({
         <p className="mt-2 text-sm text-muted-foreground">
           Version {version} · Effective 15 October 2026
         </p>
+        <p className="mt-3 rounded-md border bg-muted/40 p-3 text-sm">
+          Product draft pending final institutional and legal review.
+        </p>
         <div className="mt-8 space-y-7 leading-7 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-semibold [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-6">
           {children}
         </div>

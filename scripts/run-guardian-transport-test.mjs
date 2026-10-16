@@ -80,7 +80,7 @@ const eligibleDevices = devices.filter(
         consent.consent_version === "2026-10-16.1",
     ),
 );
-if (devices.length !== 1 || eligibleDevices.length !== 1)
+if (eligibleDevices.length !== 1)
   throw new Error("Exactly one active consented current-project test device is required");
 const device = eligibleDevices[0];
 const body = `Notifications are enabled for ${studentName}. No attendance action is required.`;

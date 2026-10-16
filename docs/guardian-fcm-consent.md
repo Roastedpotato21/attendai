@@ -16,7 +16,7 @@ The normal push worker resolves guardian, institution, student, current absence,
 
 ## Release and controlled trial
 
-1. Hold publication until institutional/legal review is complete, as directed. After review and a new release instruction, deploy policy migration `00022`, guardian consent migration `00023`, and the matching app/Worker bundle as one coordinated release. Keep unrelated SMS changes out of that bundle.
+1. The current release instruction authorizes controlled publication of the product drafts while final institutional/legal review remains pending. The pages explicitly display that status. Deploy policy migration `00022`, guardian consent migration `00023`, and the matching app/Worker bundle as one coordinated release. Production migration preflight found `00000`–`00021` already applied; only `00022` and `00023` are pending. Keep SMS delivery disabled.
 2. Verify `/privacy`, `/terms`, and `/guardian-notifications`; the standalone manifest; HTTPS; the hashed Firebase service worker; and `Service-Worker-Allowed: /` on the worker response. `scripts/check-fcm-deployment.mjs` exits nonzero if scope or manifest verification fails.
 3. Run `scripts/preflight-guardian-push.mjs`. It reports eligible device counts without printing the Firebase installation identifier. The previously active test installation needs new notice consent and is therefore not suitable until re-enrolled.
 4. If no suitable installation exists, create **one** new invitation for Attendance Test Guardian using the staff flow. For an iPhone/iPad Home Screen installation, the guardian can paste the same private link into the installed app if the invitation fragment is not retained during installation. Stop for the guardian's manual enrollment.
@@ -33,3 +33,5 @@ After `npm run build`, run `npm run test:guardian-browser`. It starts the built 
 Invitation context and permission denial are controlled browser fixtures. This test creates no production consent, device installation, or guardian account and sends no FCM message. Database invitation consumption and tenant isolation are covered separately by the disposable PostgreSQL tests. The browser profile, private preview process, and invitation fixture are removed when the test finishes.
 
 These browser checks passed on 2026-10-16. A fragment-only navigation bug in the pasted invitation flow was corrected: the page now reloads with the new invitation before validating it and removing the fragment.
+
+Public policy and guardian pages now render independently of staff authentication, including on the server. The consent query selects current accepted consent before counting eligible devices, so a preserved legacy installation without consent cannot prevent a one-device controlled trial. The attendance trial performs a Firebase validation-only request before enqueuing its single provider send.
