@@ -115,7 +115,9 @@ async function staffContext(request: Request, database: SupabaseClient) {
   if (profileError || !profile || profile.status !== "active") return null;
   const { data: roles, error: rolesError } = await database
     .from("profile_roles")
-    .select("institution_id,profile_institutions!inner(status),institutions!inner(status)")
+    .select(
+      "institution_id,profile_institutions!profile_roles_membership_fkey!inner(status),institutions!inner(status)",
+    )
     .eq("profile_id", profile.id)
     .in("role_code", ["admin", "staff"])
     .eq("profile_institutions.status", "active")

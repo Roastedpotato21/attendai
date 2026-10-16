@@ -101,26 +101,66 @@ if (process.argv.includes("--attendance")) {
     }
   }
 }
-if (!process.argv.includes("--invite")) process.exit(0);
+if (!process.argv.includes("--invite") && !process.argv.includes("--check-invitation"))
+  process.exit(0);
 if (suitable.length !== 0 || !guardian.active || !guardian.communication_consent)
   throw new Error("Guardian is not eligible for a new controlled enrollment link");
 const appUrl = process.env.ATTENDAI_APP_URL;
 if (!appUrl || new URL(appUrl).protocol !== "https:") throw new Error("HTTPS app URL is required");
 const { data: creator, error: creatorError } = await db
-  .from("profiles")
-  .select("id,profile_roles!inner(institution_id,role_code)")
-  .eq("profile_roles.institution_id", guardian.institution_id)
-  .in("profile_roles.role_code", ["admin", "staff"])
+  .from("profile_roles")
+  .select(
+    "profile_id,profiles!profile_roles_profile_id_fkey!inner(status),profile_institutions!profile_roles_membership_fkey!inner(status),institutions!inner(status)",
+  )
+  .eq("institution_id", guardian.institution_id)
+  .in("role_code", ["admin", "staff"])
+  .eq("profiles.status", "active")
+  .eq("profile_institutions.status", "active")
+  .eq("institutions.status", "active")
   .limit(1)
   .maybeSingle();
 if (creatorError || !creator) throw new Error("No authorized staff creator found");
+const { count: studentCount, error: studentError } = await db
+  .from("student_parents")
+  .select("student_id,students!inner(name,enrollment_status,institution_id)", {
+    count: "exact",
+    head: true,
+  })
+  .eq("parent_id", guardian.id)
+  .eq("institution_id", guardian.institution_id)
+  .eq("receives_notifications", true)
+  .eq("students.name", "Student One")
+  .eq("students.enrollment_status", "active")
+  .eq("students.institution_id", guardian.institution_id);
+if (studentError || studentCount !== 1)
+  throw new Error("The eligible Student One relationship is unavailable");
+const { count: invitationCount, error: pendingError } = await db
+  .from("guardian_notification_invitations")
+  .select("id", { count: "exact", head: true })
+  .eq("institution_id", guardian.institution_id)
+  .eq("guardian_id", guardian.id)
+  .is("consumed_at", null)
+  .is("revoked_at", null)
+  .gt("expires_at", new Date().toISOString());
+if (pendingError || invitationCount)
+  throw new Error("An enrollment invitation is already pending or could not be checked");
+if (!process.argv.includes("--invite")) {
+  console.log(
+    JSON.stringify({
+      invitationEligibility: "PASS",
+      authorizedStaff: true,
+      eligibleStudent: "Student One",
+    }),
+  );
+  process.exit(0);
+}
 const token = randomBytes(32).toString("base64url");
 const tokenHash = createHash("sha256").update(token).digest("hex");
 const { error: inviteError } = await db.from("guardian_notification_invitations").insert({
   institution_id: guardian.institution_id,
   guardian_id: guardian.id,
   token_hash: tokenHash,
-  created_by: creator.id,
+  created_by: creator.profile_id,
   expires_at: new Date(Date.now() + 15 * 60000).toISOString(),
 });
 if (inviteError) throw new Error("Enrollment invitation could not be created");

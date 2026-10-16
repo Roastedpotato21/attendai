@@ -24,7 +24,8 @@ const privacyPageVisible =
   privacyResponse.ok &&
   privacyHtml.includes("Privacy Policy") &&
   privacyHtml.includes("guardian notification");
-const termsPageVisible = termsResponse.ok && termsHtml.includes("Terms & Conditions");
+const termsPageVisible =
+  termsResponse.ok && termsHtml.replaceAll("&amp;", "&").includes("Terms & Conditions");
 console.log(
   JSON.stringify({
     privacyRouteHttp: privacyResponse.status,

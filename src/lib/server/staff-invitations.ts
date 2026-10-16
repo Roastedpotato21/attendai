@@ -89,7 +89,9 @@ async function adminContext(request: Request, db: SupabaseClient): Promise<Admin
   if (!profile || profile.status !== "active") return null;
   const { data, error } = await db
     .from("profile_roles")
-    .select("institution_id, profile_institutions!inner(status), institutions!inner(status)")
+    .select(
+      "institution_id, profile_institutions!profile_roles_membership_fkey!inner(status), institutions!inner(status)",
+    )
     .eq("profile_id", profile.id)
     .eq("role_code", "admin")
     .eq("profile_institutions.status", "active")
@@ -216,7 +218,7 @@ async function memberInTenant(
     throw new Error("Administrators cannot change their own staff access.");
   const { data, error } = await db
     .from("profile_institutions")
-    .select("profiles!inner(id, name, email, status)")
+    .select("profiles!profile_institutions_profile_id_fkey!inner(id, name, email, status)")
     .eq("profile_id", profileId)
     .eq("institution_id", context.institutionId)
     .maybeSingle();
@@ -338,7 +340,7 @@ export async function handleStaffManagementRequest(request: Request): Promise<Re
       const { data: memberships, error } = await db
         .from("profile_institutions")
         .select(
-          "profile_id, status, invited_at, activated_at, profiles!inner(id, name, email, status)",
+          "profile_id, status, invited_at, activated_at, profiles!profile_institutions_profile_id_fkey!inner(id, name, email, status)",
         )
         .eq("institution_id", context.institutionId)
         .order("created_at", { ascending: false });
