@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { firebaseVapidKey, guardianMessaging } from "@/lib/firebase-client";
 import { GUARDIAN_NOTIFICATION_CONSENT_VERSION } from "@/lib/guardian-consent";
+import { showGuardianTestNotification } from "@/lib/guardian-test-notification";
 import workerUrl from "@/lib/firebase-messaging-sw.ts?worker&url";
 
 export const Route = createFileRoute("/guardian-notifications")({
@@ -40,6 +41,7 @@ function GuardianNotifications() {
   const [consented, setConsented] = useState(false);
   const [showHomeScreenHelp, setShowHomeScreenHelp] = useState(false);
   const [pastedLink, setPastedLink] = useState("");
+  const [receivedTestId, setReceivedTestId] = useState<string | null>(null);
   const invitation = useRef<string | null>(null);
   const registered = useRef(false);
 
@@ -53,6 +55,7 @@ function GuardianNotifications() {
         type: "module",
         scope: "/",
       });
+      await navigator.serviceWorker.ready;
       await new Promise<void>((resolve, reject) => {
         let initial = true;
         let handling = false;
@@ -107,34 +110,20 @@ function GuardianNotifications() {
       onMessage(messaging, (payload) => {
         const testId = payload.data?.["testId"];
         if (testId) {
-          if (payload.data?.["testMode"] === "guardian") {
-            setMessage(
-              payload.notification?.body ??
-                "AttendAI notification test received. No attendance action is required.",
-            );
-            void post("test-acknowledge", { testId });
-            return;
-          }
-          if (payload.data?.["testMode"] === "online") {
-            setMessage(
-              "AttendAI Online Push Test: This is a test notification. No attendance action is required.",
-            );
-            void serviceWorkerRegistration
-              .showNotification("AttendAI Online Push Test", {
-                body: "This is a test notification. No attendance action is required.",
-                tag: `online-test-${testId}`,
-              })
-              .catch(() =>
-                setMessage(
-                  "The test arrived, but this device could not display a system notification.",
-                ),
-              );
-            return;
-          }
           setMessage(
-            "AttendAI Offline Delivery Test: This test checks delayed notification delivery after internet reconnects.",
+            payload.notification?.body ??
+              "AttendAI notification test received. No attendance action is required.",
           );
-          void post("test-acknowledge", { testId });
+          void showGuardianTestNotification(payload, serviceWorkerRegistration)
+            .then(() => {
+              if (["guardian", "offline"].includes(payload.data?.["testMode"] ?? ""))
+                setReceivedTestId(testId);
+            })
+            .catch(() =>
+              setMessage(
+                "The test reached this page, but a system notification could not be displayed. Check Chrome and Android notification settings.",
+              ),
+            );
           return;
         }
         const communicationId = payload.data?.["communicationId"];
@@ -222,6 +211,10 @@ function GuardianNotifications() {
         consentRequired?: boolean;
       };
       if (!deviceStatus.enabled) {
+        if (live && deviceStatus.consentRequired)
+          setMessage(
+            "This device needs your notification consent. Ask your institution for a new private enrollment link and accept the notice on this phone.",
+          );
         if (live) setStatus("invalid");
         return;
       }
@@ -317,6 +310,21 @@ function GuardianNotifications() {
     }
   };
 
+  const confirmTest = async () => {
+    if (!receivedTestId || busy) return;
+    setBusy(true);
+    try {
+      const response = await post("test-acknowledge", { testId: receivedTestId });
+      if (!response.ok) throw new Error("Could not save confirmation. Please try again.");
+      setReceivedTestId(null);
+      setMessage("Thank you. Receipt of the test notification is confirmed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not confirm receipt");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const openPastedInvitation = () => {
     try {
       const url = new URL(pastedLink.trim(), window.location.origin);
@@ -370,9 +378,11 @@ function GuardianNotifications() {
             <>
               <p className="text-left text-sm text-muted-foreground">
                 Alerts may include a linked student's name, attendance status, and date. Delivery
-                depends on browser support and an internet connection. You can later remove
-                notification permission in your device settings. Enrollment does not create a staff
-                account or give access to the institution's application. Read the{" "}
+                uses Google Firebase Cloud Messaging and depends on browser support and an internet
+                connection. Notifications may appear on your lock screen. You can withdraw consent
+                using Disable on this device or remove notification permission in your device
+                settings. Enrollment does not create a staff account or give access to the
+                institution's application. Read the{" "}
                 <a
                   href="/privacy"
                   target="_blank"
@@ -396,13 +406,22 @@ function GuardianNotifications() {
                 </span>
               </label>
               <Button onClick={() => void enable()} disabled={busy || !consented}>
-                Enable Notifications
+                {busy ? "Enabling notifications…" : "Enable Notifications"}
               </Button>
+              <p className="text-xs text-muted-foreground">
+                On Android, open this link in Chrome and choose Allow when prompted. No phone number
+                or app download is needed.
+              </p>
             </>
           )}
           {status === "enabled" && (
             <>
               <p className="text-sm font-medium">Notifications enabled</p>
+              <p className="text-sm text-muted-foreground">
+                Consent saved for this device. You can now receive your institution's notifications.
+                For a test, check your notification shade and tap the notification to confirm
+                receipt.
+              </p>
               <Button variant="outline" onClick={() => void revoke()} disabled={busy}>
                 Disable on this device
               </Button>
@@ -463,6 +482,11 @@ function GuardianNotifications() {
             <p role="status" className="rounded-md bg-muted p-3 text-sm">
               {message}
             </p>
+          )}
+          {receivedTestId && status === "enabled" && (
+            <Button onClick={() => void confirmTest()} disabled={busy}>
+              I saw the test notification
+            </Button>
           )}
         </CardContent>
       </Card>

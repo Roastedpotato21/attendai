@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { handleGuardianNotificationDevice } from "../src/lib/server/guardian-notifications.ts";
+import { showGuardianTestNotification } from "../src/lib/guardian-test-notification.ts";
 
 const origin = "https://attendai.example.invalid";
 const eventId = "10000000-0000-4000-8000-000000000001";
@@ -49,11 +50,21 @@ async function withDatabase(overrides, run) {
     attendance_records: { status: "absent" },
     ...overrides,
   };
-  globalThis.fetch = async (input) => {
+  globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : input);
     assert.equal(url.origin, "https://database.example.invalid");
     const table = url.pathname.split("/").at(-1);
     reads.push(table);
+    if (table === "consume_guardian_notification_invitation_with_consent") {
+      assert.equal(init.method, "POST");
+      const payload = JSON.parse(init.body);
+      assert.equal(payload.p_consent_version, "2026-10-16.1");
+      assert.equal(payload.p_project_id, "attendai-41f64");
+      assert.equal(payload.p_fid, "f".repeat(43));
+      assert.match(payload.p_token_hash, /^[0-9a-f]{64}$/);
+      assert.match(payload.p_device_secret_hash, /^[0-9a-f]{64}$/);
+      return Response.json(eventId);
+    }
     assert.ok(Object.hasOwn(rows, table), `Unexpected database request: ${table}`);
     if (table === "student_parents") {
       assert.equal(url.searchParams.get("institution_id"), "eq.tenant");
@@ -137,6 +148,125 @@ test("device enrollment refuses missing affirmative consent before database cons
     assert.equal(response.status, 400);
     assert.deepEqual(reads, []);
   });
+});
+
+test("enrollment rejects unchecked or obsolete consent without consuming an invitation", async () => {
+  for (const consent of [
+    { consent: false, consentVersion: "2026-10-16.1" },
+    { consent: true, consentVersion: "old-version" },
+  ]) {
+    await withDatabase({}, async (reads) => {
+      const response = await handleGuardianNotificationDevice(
+        request(
+          "enroll",
+          JSON.stringify({
+            invitation: "a".repeat(43),
+            installationId: "f".repeat(43),
+            ...consent,
+          }),
+        ),
+      );
+      assert.equal(response.status, 400);
+      assert.deepEqual(reads, []);
+    });
+  }
+});
+
+test("affirmative current consent atomically enrolls the device and sets its private cookie", async () => {
+  await withDatabase({}, async (reads) => {
+    const response = await handleGuardianNotificationDevice(
+      request(
+        "enroll",
+        JSON.stringify({
+          invitation: "a".repeat(43),
+          installationId: "f".repeat(43),
+          consent: true,
+          consentVersion: "2026-10-16.1",
+        }),
+      ),
+    );
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), { enabled: true });
+    assert.match(response.headers.get("set-cookie"), /HttpOnly; Secure; SameSite=Strict/);
+    assert.deepEqual(reads, ["consume_guardian_notification_invitation_with_consent"]);
+  });
+});
+
+test("foreground FCM tests display a system notification with a safe click target", async () => {
+  const notifications = [];
+  await showGuardianTestNotification(
+    {
+      data: { testId: eventId, testMode: "guardian" },
+      notification: {
+        title: "AttendAI Notification Test",
+        body: "No attendance action is required.",
+      },
+    },
+    { showNotification: async (...args) => notifications.push(args) },
+  );
+  assert.deepEqual(notifications, [
+    [
+      "AttendAI Notification Test",
+      {
+        body: "No attendance action is required.",
+        tag: `guardian-test-${eventId}`,
+        icon: "/guardian-icon.svg",
+        data: { attendaiTestId: eventId, attendaiTestMode: "guardian" },
+      },
+    ],
+  ]);
+});
+
+test("invalid test payloads cannot display notifications and display failures remain failures", async () => {
+  for (const data of [
+    { testId: "bad", testMode: "guardian" },
+    { testId: eventId, testMode: "other" },
+  ]) {
+    await assert.rejects(
+      showGuardianTestNotification(
+        { data },
+        {
+          showNotification: async () => assert.fail("Invalid test must not display"),
+        },
+      ),
+      /Invalid notification test/,
+    );
+  }
+  await assert.rejects(
+    showGuardianTestNotification(
+      { data: { testId: eventId, testMode: "guardian" } },
+      {
+        showNotification: async () => {
+          throw new Error("Permission removed");
+        },
+      },
+    ),
+    /Permission removed/,
+  );
+});
+
+test("test receipt acknowledgement is scoped to the consented device and accepted test", async () => {
+  await withDatabase(
+    { controlled_push_tests: { id: eventId, status: "provider_accepted" } },
+    async (reads) => {
+      const response = await handleGuardianNotificationDevice(
+        request("test-acknowledge", JSON.stringify({ testId: eventId })),
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { acknowledged: true });
+      assert.equal(reads.filter((table) => table === "controlled_push_tests").length, 2);
+    },
+  );
+  await withDatabase(
+    { controlled_push_tests: { id: eventId, status: "sending" } },
+    async (reads) => {
+      const response = await handleGuardianNotificationDevice(
+        request("test-acknowledge", JSON.stringify({ testId: eventId })),
+      );
+      assert.equal(response.status, 404);
+      assert.equal(reads.filter((table) => table === "controlled_push_tests").length, 1);
+    },
+  );
 });
 
 test("revocation timestamp invalidates a device cookie even if active is inconsistent", async () => {

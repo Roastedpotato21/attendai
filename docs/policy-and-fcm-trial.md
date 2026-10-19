@@ -1,6 +1,24 @@
 # AttendAI policy and FCM rollout
 
+## Production consent release on 2026-10-19
+
+- The current task authorizes Android/Chrome guardian enrollment and one isolated guardian transport test. The previous task's restrictions on transport tests below are historical. Attendance testing is deferred; no attendance event is created or reused.
+- Deployed the mobile consent, staff enrollment QR, foreground system notification, and explicit test receipt confirmation changes to the existing production Worker. Cloudflare version: `3d3dcb19-ce74-4207-8dfa-fbd77dbcb6a0`.
+- Both automatic delivery modes were explicitly set to `disabled` before deployment. Production settings and secrets were preserved by deploying with `--keep-vars`.
+- Production checks passed for `/privacy`, `/terms`, guardian page, standalone manifest, root service-worker scope, JavaScript content type, and `Service-Worker-Allowed: /`. The isolated Chrome consent/worker test also passed against production with fixture invitation responses.
+- Local checks passed: 58 communication/security tests, TypeScript, ESLint, production build, isolated Chrome, and the disposable PostgreSQL suite through migration `00023`. Firebase server authentication passed without a notification send.
+- A one-use invitation was created for the user to open on their Android phone and personally accept notification consent. The latest device preflight still reports zero suitable consented devices. The controlled transport test is not reserved and no notification has been sent. Actual phone enrollment and receipt remain pending human action; provider acceptance and display are not claimed.
+- See `guardian-fcm-consent.md` for the enrollment and one-test verification procedure, including the new read-only `--status` command. Invitation capabilities and device identifiers must not be committed.
+
 ## Verification on 2026-10-16
+
+### Later verification on 2026-10-16
+
+- The production policy check now passes: both active policy rows are version `2026-10-15.1`, and `/privacy` and `/terms` return HTTP 200 with the expected content. The earlier 404 and missing-migration observations below describe an earlier deployment state.
+- The production FCM deployment check now passes: the guardian page and manifest return HTTP 200, the client requests root service-worker scope, and the worker returns HTTP 200 with `Service-Worker-Allowed: /` and a JavaScript content type. The earlier missing-manifest and worker-header observations below describe an earlier deployment state.
+- Local verification passed again: 53 communication tests, 5 auth error tests, the disposable PostgreSQL suite through migration `00023`, TypeScript, ESLint, the production build, and `git diff --check`.
+- The live guardian device and attendance preflight could not be completed in this session because automatic approval review rejected the network command as potentially able to dispatch a sensitive attendance alert. The command's source was inspected and contains no send path without `--invite`, but the rejection was honored. No invitation or FCM send was attempted. Production guardian consent records and suitable device count therefore remain unverified here.
+- This task authorizes at most one attendance push and one offline/reconnect test push. The guardian transport test and online test scripts are alternatives for other separately authorized trials; do not run their `--send` modes during this task.
 
 - Local validation passed: 53 communication tests, 5 auth error tests, the disposable PostgreSQL suite through migration `00023`, TypeScript, ESLint, and the production build. The policy migration gates interventions and escalations for staff who have not accepted the current version. Migration `00023` adds independent versioned guardian notification consent and requires it before push dispatch.
 - Private browser verification passed: both policy pages, manifest, native worker root scope, initially unchecked consent, direct-click permission timing, denial, invalid invitations, and pasted-link revalidation. Context and denial used fixtures; no production consent or FCM send was created. The temporary browser profile, invitation fixture, and private preview were removed afterward.
@@ -27,8 +45,8 @@ The guardian service worker is registered at origin scope `/`. The hashed worker
 
 1. Deploy both migrations and the matching application/Worker. Keep general `FCM_DELIVERY_MODE` disabled during the controlled trial so the scheduled worker cannot drain other pending push jobs.
 2. Generate exactly one short-lived link for Attendance Test Guardian and wait for human enrollment on one device. Verify one current-project installation and a current consent record before attempting a provider call.
-3. Run `node --env-file-if-exists=.env scripts/run-guardian-transport-test.mjs --preflight`, then `--validate`. The validation call does not display a notification. With human enrollment confirmed and validation successful, `--send` reserves one durable execution key and sends one clearly labeled transport test that makes no attendance claim. Do not rerun a send with an uncertain outcome.
+3. Run the attendance preflight and send through `scripts/run-controlled-attendance-push.mjs` only if a fresh, legitimate Student One absence meets every check. It prints the exact alert before sending. If no safe event exists, do not fabricate or reuse an old absence; stop the attendance trial. Do not rerun a send with an uncertain outcome.
 4. Observe foreground/background/browser-closed display on the one enrolled test device, where the browser supports it. Record human observation separately from provider acceptance.
-5. Only after the tester confirms that same device is offline, run `node --env-file-if-exists=.env scripts/run-offline-push-test.mjs --confirmed-offline`. This sends one clearly labeled test notification unrelated to attendance and records its provider result. The fixed execution key prevents reuse. Ask the tester to reconnect within five minutes, then verify display and acknowledgement. If it does not arrive, investigate without resending.
+5. Only after the online attendance trial is proven and the tester confirms that same device is offline, run `node --env-file-if-exists=.env scripts/run-offline-push-test.mjs --confirmed-offline`. This sends one clearly labeled test notification unrelated to attendance and records its provider result. The fixed execution key prevents reuse. Ask the tester to reconnect within five minutes, then verify display and acknowledgement. If it does not arrive, investigate without resending.
 
 No SMS transport is part of these trials.

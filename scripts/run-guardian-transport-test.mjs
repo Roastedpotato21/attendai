@@ -6,8 +6,8 @@ import {
 } from "../src/lib/server/fcm-provider.ts";
 
 const mode = process.argv.slice(2);
-if (mode.length !== 1 || !["--preflight", "--validate", "--send"].includes(mode[0]))
-  throw new Error("Choose exactly one of --preflight, --validate, or --send");
+if (mode.length !== 1 || !["--preflight", "--validate", "--send", "--status"].includes(mode[0]))
+  throw new Error("Choose exactly one of --preflight, --validate, --send, or --status");
 if (process.env.FIREBASE_PROJECT_ID !== "attendai-41f64")
   throw new Error("Wrong Firebase project; no send attempted");
 const appUrl = new URL(process.env.ATTENDAI_APP_URL);
@@ -27,6 +27,28 @@ if (
 )
   throw new Error("Designated guardian is unavailable or communication consent is off");
 const guardian = guardians[0];
+const executionKey = "guardian-transport-20261016-v1";
+if (mode[0] === "--status") {
+  const { data, error } = await db
+    .from("controlled_push_tests")
+    .select("status,provider_message_id,display_acknowledged_at,created_at")
+    .eq("institution_id", guardian.institution_id)
+    .eq("guardian_id", guardian.id)
+    .eq("execution_key", executionKey)
+    .maybeSingle();
+  if (error) throw new Error("Could not read the controlled test result");
+  console.log(
+    JSON.stringify({
+      testReserved: Boolean(data),
+      status: data?.status ?? "not_started",
+      providerAccepted: data?.status === "provider_accepted",
+      providerMessageIdStored: Boolean(data?.provider_message_id),
+      deviceReceiptAcknowledged: Boolean(data?.display_acknowledged_at),
+      acknowledgedAt: data?.display_acknowledged_at ?? null,
+    }),
+  );
+  process.exit(0);
+}
 const [institutionResult, relationshipResult, deviceResult, consentResult] = await Promise.all([
   db.from("institutions").select("status").eq("id", guardian.institution_id).maybeSingle(),
   db
@@ -126,7 +148,6 @@ if (!validation.ok) throw new Error(`FCM validation failed: ${validation.code}; 
 console.log("FCM CONTROLLED PREFLIGHT PASSED");
 if (mode[0] === "--validate") process.exit(0);
 
-const executionKey = "guardian-transport-20261016-v1";
 const { data: trial, error: insertError } = await db
   .from("controlled_push_tests")
   .insert({

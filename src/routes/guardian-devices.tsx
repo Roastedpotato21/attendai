@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
+import QRCode from "react-qr-code";
 
 import { PageHeader } from "@/components/common/page-parts";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,10 @@ async function api(method: "GET" | "POST", input?: Record<string, string>) {
     },
     ...(input ? { body: JSON.stringify(input) } : {}),
   });
-  if (!response.ok) throw new Error("Guardian devices could not be updated");
+  if (!response.ok) {
+    const result = (await response.json()) as { error?: string };
+    throw new Error(result.error ?? "Guardian devices could not be updated");
+  }
   return response.json() as Promise<{ guardians?: Guardian[]; link?: string }>;
 }
 
@@ -109,6 +113,13 @@ function GuardianDevices() {
             <p className="text-sm">
               Share this link privately. It expires in 15 minutes and works once.
             </p>
+            <div className="inline-block rounded-md bg-white p-3">
+              <QRCode value={link} size={180} title="Scan to enroll your phone for notifications" />
+            </div>
+            <p className="text-sm">
+              Scan on the parent's phone, open in Chrome on Android, check the consent box, then tap
+              Enable Notifications and Allow. Each phone needs its own link and consent.
+            </p>
             <p className="break-all rounded-md bg-muted p-3 text-xs">{link}</p>
             <Button variant="outline" onClick={() => void navigator.clipboard.writeText(link)}>
               Copy link
@@ -138,7 +149,7 @@ function GuardianDevices() {
                     ·{" "}
                     {active.length
                       ? `${active.length} active device${active.length === 1 ? "" : "s"}`
-                      : "No registered device"}
+                      : "No device ready for notifications"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Linked students:{" "}
@@ -170,22 +181,24 @@ function GuardianDevices() {
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={busy !== null || !guardian.active}
+                  disabled={busy !== null || !guardian.active || !guardian.communicationConsent}
                   onClick={() => void invite(guardian.id)}
                 >
                   Create enrollment link
                 </Button>
-                {active.map((device, index) => (
-                  <Button
-                    key={device.id}
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy !== null}
-                    onClick={() => void revoke(device.id)}
-                  >
-                    Revoke device {index + 1}
-                  </Button>
-                ))}
+                {guardian.devices
+                  .filter((device) => device.active && !device.revokedAt)
+                  .map((device, index) => (
+                    <Button
+                      key={device.id}
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy !== null}
+                      onClick={() => void revoke(device.id)}
+                    >
+                      Revoke device {index + 1}
+                    </Button>
+                  ))}
               </CardContent>
             </Card>
           );

@@ -4,6 +4,24 @@ import { getMessaging, onBackgroundMessage } from "firebase/messaging/sw";
 
 declare const self: ServiceWorkerGlobalScope;
 
+// Notifications displayed by the foreground page need their own safe click route.
+self.addEventListener("notificationclick", (event) => {
+  const data = event.notification.data as
+    { attendaiTestId?: string; attendaiTestMode?: string } | undefined;
+  if (
+    !data?.attendaiTestId ||
+    !/^[0-9a-f-]{36}$/i.test(data.attendaiTestId) ||
+    !["guardian", "online", "offline"].includes(data.attendaiTestMode ?? "")
+  )
+    return;
+  event.stopImmediatePropagation();
+  event.notification.close();
+  const link = new URL("/guardian-notifications", self.location.origin);
+  link.searchParams.set("test", data.attendaiTestMode!);
+  link.searchParams.set("id", data.attendaiTestId);
+  event.waitUntil(self.clients.openWindow(link.toString()));
+});
+
 if (
   import.meta.env["VITE_FIREBASE_PROJECT_ID"] !== "attendai-41f64" ||
   import.meta.env["VITE_FIREBASE_MESSAGING_SENDER_ID"] !== "849652695985" ||

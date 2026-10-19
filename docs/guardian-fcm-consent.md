@@ -1,5 +1,36 @@
 # Accountless guardian notification enrollment
 
+## Android production verification on 2026-10-19
+
+The current task authorizes enrolling the user's Android/Chrome phone and sending one isolated guardian transport test. This supersedes the earlier task-specific restriction against that transport test in `policy-and-fcm-trial.md`. Attendance testing is deferred until a legitimate fresh event exists. General FCM and SMS delivery remain disabled.
+
+Staff can open **Guardian devices**, create a private enrollment link, and show its QR code to the parent. Open the link in Chrome on the receiving phone. The parent must check the initially empty consent box, tap **Enable Notifications**, and grant browser permission. FCM addresses the browser installation; a phone number is not required or used. Each additional phone needs its own one-use invitation and affirmative consent. Existing device records are preserved; consent is never populated by an operator on a parent's behalf.
+
+The notice explains Firebase delivery, lock-screen visibility, and withdrawal. The enabled page confirms saved consent. A device without the current notice receives a specific prompt to obtain a new enrollment link. Staff can also revoke an active legacy installation that has no consent.
+
+Foreground test messages now request a system notification as well as showing their text in the page. They do not automatically record display acknowledgement. The user can tap the system notification or choose **I saw the test notification** after seeing it. Background FCM notification payloads use Firebase's automatic display and HTTPS click link. Provider acceptance and device acknowledgement remain separate results.
+
+After enrollment, refresh the guardian page on the phone after deployment, then run:
+
+```sh
+node --env-file-if-exists=.env scripts/preflight-guardian-push.mjs
+node --env-file-if-exists=.env scripts/run-guardian-transport-test.mjs --preflight
+node --env-file-if-exists=.env scripts/run-guardian-transport-test.mjs --validate
+node --env-file-if-exists=.env scripts/run-guardian-transport-test.mjs --send
+node --env-file-if-exists=.env scripts/run-guardian-transport-test.mjs --status
+```
+
+Run `--send` only once after current consent and provider validation pass. The durable execution key prevents a second send. `--status` only reads the stored result and is safe to repeat. A successful provider result must not be described as confirmed phone delivery until the device acknowledgement or tester's observation is available. A device must be enrolled by the parent; a browser fixture cannot establish production consent or phone delivery.
+
+References checked for this release:
+
+- [Firebase Web registration and installation IDs](https://firebase.google.com/docs/cloud-messaging/web/get-started)
+- [Firebase foreground and background message handling](https://firebase.google.com/docs/cloud-messaging/web/receive-messages)
+- [Firebase JavaScript messaging API](https://firebase.google.com/docs/reference/js/messaging)
+- [WebKit iOS Home Screen push requirements](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)
+
+Local validation: 58 communication/security tests, TypeScript, ESLint, production build, isolated Chrome consent/service-worker checks, and the disposable PostgreSQL suite through migration `00023` passed. Server Firebase authentication also passed without sending a message. Production deployment and phone trial results are recorded in `policy-and-fcm-trial.md`.
+
 ## Flow
 
 Authorized staff create a 15-minute, one-use invitation in Guardian devices. The private URL stores its random capability in the fragment. The public guardian page submits that capability to the server, which validates the invitation before returning only the institution name and eligible linked student names. The guardian checks an initially empty consent box and taps **Enable Notifications**. Only then does the browser ask for notification permission. The server atomically consumes the invitation, registers the Firebase installation for `attendai-41f64`, and stores guardian notice version `2026-10-16.1` in `guardian_notification_consents`. No guardian staff or Supabase Auth account is created.
