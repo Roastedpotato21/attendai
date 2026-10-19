@@ -883,13 +883,17 @@ test("FCM validation-only request targets the enrolled FID with the exact alert"
       ["UNREGISTERED", "invalid_device"],
     ]) {
       globalThis.fetch = async () =>
-        Response.json({ error: { details: [{ errorCode }] } }, { status: 400 });
+        Response.json(
+          { error: { status: "INVALID_ARGUMENT", details: [{ errorCode }] } },
+          { status: 400 },
+        );
       const rejected = await sendControlledDeliveryTest({
         installationId: "fid-guardian-trial-0001",
         testId: "10000000-0000-4000-8000-000000000003",
         mode: "online",
       });
       assert.equal(rejected.kind, expectedKind);
+      assert.equal(rejected.safeReason, "FCM HTTP 400: INVALID_ARGUMENT");
     }
   } finally {
     globalThis.fetch = originalFetch;

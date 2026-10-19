@@ -31,7 +31,9 @@ const executionKey = "guardian-transport-20261016-v1";
 if (mode[0] === "--status") {
   const { data, error } = await db
     .from("controlled_push_tests")
-    .select("status,provider_message_id,display_acknowledged_at,created_at")
+    .select(
+      "status,provider,provider_message_id,submitted_at,completed_at,failure_code,failure_reason,display_acknowledged_at",
+    )
     .eq("institution_id", guardian.institution_id)
     .eq("guardian_id", guardian.id)
     .eq("execution_key", executionKey)
@@ -41,6 +43,9 @@ if (mode[0] === "--status") {
     JSON.stringify({
       testReserved: Boolean(data),
       status: data?.status ?? "not_started",
+      provider: data?.provider ?? "fcm",
+      submittedAt: data?.submitted_at ?? null,
+      failureReason: data?.failure_reason ?? null,
       providerAccepted: data?.status === "provider_accepted",
       providerMessageIdStored: Boolean(data?.provider_message_id),
       deviceReceiptAcknowledged: Boolean(data?.display_acknowledged_at),
@@ -102,8 +107,9 @@ const eligibleDevices = devices.filter(
         consent.consent_version === "2026-10-16.1",
     ),
 );
-if (eligibleDevices.length !== 1)
-  throw new Error("Exactly one active consented current-project test device is required");
+if (eligibleDevices.length === 0) throw new Error("NO ACTIVE GUARDIAN DEVICE");
+if (eligibleDevices.length > 1)
+  throw new Error("MULTIPLE ACTIVE DEVICES — SELECT ONE BEFORE TESTING");
 const device = eligibleDevices[0];
 const body = `Notifications are enabled for ${studentName}. No attendance action is required.`;
 console.log(
@@ -120,6 +126,15 @@ console.log(
   }),
 );
 if (mode[0] === "--preflight") process.exit(0);
+
+// An existing reservation fences all repeat runs, including uncertain outcomes.
+const { data: priorTest, error: priorError } = await db
+  .from("controlled_push_tests")
+  .select("id")
+  .eq("execution_key", executionKey)
+  .maybeSingle();
+if (priorError) throw new Error("Could not verify the one-attempt execution fence");
+if (priorTest) throw new Error("The one authorized test was already reserved; no send attempted");
 
 const { data: activePolicies, error: policyError } = await db
   .from("policy_versions")
@@ -144,8 +159,11 @@ const validation = await sendGuardianTransportTest(
   },
   true,
 );
-if (!validation.ok) throw new Error(`FCM validation failed: ${validation.code}; no send attempted`);
-console.log("FCM CONTROLLED PREFLIGHT PASSED");
+if (!validation.ok)
+  throw new Error(
+    `FCM validation failed: ${validation.safeReason ?? validation.code}; no send attempted`,
+  );
+console.log("FCM TEST PREFLIGHT PASSED");
 if (mode[0] === "--validate") process.exit(0);
 
 const { data: trial, error: insertError } = await db
@@ -157,6 +175,8 @@ const { data: trial, error: insertError } = await db
     installation_id: device.id,
     execution_key: executionKey,
     status: "sending",
+    provider: "fcm",
+    submitted_at: new Date().toISOString(),
     ttl_seconds: 300,
   })
   .select("id")
@@ -175,7 +195,13 @@ const status = result.ok
     : "failed";
 const { error: updateError } = await db
   .from("controlled_push_tests")
-  .update({ status, provider_message_id: result.ok ? result.providerId : null })
+  .update({
+    status,
+    provider_message_id: result.ok ? result.providerId : null,
+    completed_at: new Date().toISOString(),
+    failure_code: result.ok ? null : result.code,
+    failure_reason: result.ok ? null : (result.safeReason ?? result.code),
+  })
   .eq("id", trial.id)
   .eq("institution_id", guardian.institution_id)
   .eq("status", "sending");
@@ -187,6 +213,7 @@ console.log(
     providerMessageIdStored: result.ok,
     deviceDisplayObserved: "UNKNOWN",
     status,
+    failureReason: result.ok ? null : (result.safeReason ?? result.code),
   }),
 );
 if (!result.ok) process.exitCode = 1;

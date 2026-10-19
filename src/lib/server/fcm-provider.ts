@@ -5,6 +5,7 @@ export type PushFailure = {
   ok: false;
   kind: "retryable" | "invalid_device" | "permanent" | "unconfirmed";
   code: string;
+  safeReason?: string;
 };
 export type PushResult = { ok: true; providerId: string } | PushFailure;
 export type PushInput = {
@@ -275,8 +276,17 @@ export async function sendControlledDeliveryTest(
         signal: AbortSignal.timeout(15_000),
       },
     );
-    const result = (await response.json()) as { name?: string };
-    if (!response.ok) return classifyFcmError({ code: errorCode(result, response.status) });
+    const result = (await response.json()) as { name?: string; error?: { status?: string } };
+    if (!response.ok) {
+      const failure = classifyFcmError({ code: errorCode(result, response.status) });
+      const providerStatus = result.error?.status;
+      return {
+        ...failure,
+        safeReason: `FCM HTTP ${response.status}: ${
+          providerStatus && /^[A-Z_]{1,60}$/.test(providerStatus) ? providerStatus : failure.code
+        }`,
+      };
+    }
     if (!result.name?.startsWith(`projects/${projectId}/messages/`))
       return { ok: false, kind: "unconfirmed", code: "unknown" };
     return { ok: true, providerId: result.name };
