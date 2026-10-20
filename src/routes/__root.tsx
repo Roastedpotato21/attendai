@@ -109,7 +109,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
     ],
   }),
   shellComponent: RootShell,
@@ -148,7 +148,7 @@ function RootComponent() {
 const PUBLIC_ROUTES = getPublicRoutes();
 
 function AuthWrapper() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, verificationAccess } = useAuth();
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
@@ -183,6 +183,20 @@ function AuthWrapper() {
   // Centralized route guard logic using the shared route-auth config
   useEffect(() => {
     if (isLoading || isPublicContent) return;
+    if (
+      !user &&
+      verificationAccess &&
+      ![
+        "/institution-verification",
+        "/institution-review",
+        "/create-account",
+        "/accept-invite",
+        "/policy-consent",
+      ].includes(pathname)
+    ) {
+      void router.navigate({ to: "/institution-verification", replace: true });
+      return;
+    }
 
     if (
       user &&
@@ -207,7 +221,16 @@ function AuthWrapper() {
       // Role not allowed for this route → redirect to home
       void router.navigate({ to: "/", replace: true });
     }
-  }, [user, isLoading, pathname, isPublicRoute, isPublicContent, router, policyState]);
+  }, [
+    user,
+    verificationAccess,
+    isLoading,
+    pathname,
+    isPublicRoute,
+    isPublicContent,
+    router,
+    policyState,
+  ]);
 
   // These pages are available independently of staff session and policy state.
   // Rendering them on the server also makes the legal notice readable without JS.

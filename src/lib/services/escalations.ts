@@ -3,7 +3,6 @@
  *
  * Directs all reads and updates to the hardened escalationRepository.
  * In Supabase mode, persists to Supabase and throws typed database errors.
- * In explicit mock mode, uses memoryDb.
  */
 
 import type { Escalation } from "@/lib/types";

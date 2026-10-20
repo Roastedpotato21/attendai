@@ -1,4 +1,5 @@
-import { memoryDb, hasDatabaseConnection, supabase } from "../connection";
+import { readAllRows } from "../pagination";
+import { supabase } from "../connection";
 import type { DbStudent, DbClass, DbParent } from "../schema";
 import { fromSupabaseError } from "../errors";
 
@@ -82,80 +83,57 @@ const mapSupabaseStudent = (row: SupabaseStudentRow): PopulatedStudent => {
 
 export const studentRepository = {
   async findByClassId(classId: string): Promise<PopulatedStudent[]> {
-    if (hasDatabaseConnection() && supabase) {
-      const { data, error } = await supabase
-        .from("students")
-        .select("*, classes(*), parents(*)")
-        .eq("class_id", classId)
-        .eq("enrollment_status", "active")
-        .order("roll");
-      if (error) throw fromSupabaseError("class student list", error);
-      return (data ?? []).map((row) => mapSupabaseStudent(row as SupabaseStudentRow));
-    }
-    return (await this.findAll()).filter((student) => student.classId === classId);
+    const data = await readAllRows(
+      (from, to) =>
+        supabase
+          .from("students")
+          .select("*, classes(*), parents(*)")
+          .eq("class_id", classId)
+          .eq("enrollment_status", "active")
+          .order("roll")
+          .order("id")
+          .range(from, to),
+      "student findByClassId",
+    );
+
+    return (data ?? []).map((row) => mapSupabaseStudent(row as SupabaseStudentRow));
   },
   async findAll(): Promise<PopulatedStudent[]> {
-    if (hasDatabaseConnection() && supabase) {
-      const { data, error } = await supabase.from("students").select(`
-          *,
-          classes (*),
-          parents (*)
-        `);
-
-      if (error) throw fromSupabaseError("student list", error);
-      if (!data) return [];
-      return data.map((row) => mapSupabaseStudent(row as SupabaseStudentRow));
-    }
-
-    return memoryDb.students.map((s) => {
-      const cls = memoryDb.classes.find((c) => c.id === s.classId);
-      const parent = memoryDb.parents.find((p) => p.id === s.parentId);
-
-      if (!cls || !parent) {
-        throw new Error(`Data integrity error for student ${s.id}`);
-      }
-
-      return {
-        ...s,
-        class: cls,
-        parent: parent,
-      };
-    });
-  },
-
-  async findById(id: string): Promise<PopulatedStudent | null> {
-    if (hasDatabaseConnection() && supabase) {
-      const { data, error } = await supabase
-        .from("students")
-        .select(
-          `
+    const data = await readAllRows(
+      (from, to) =>
+        supabase
+          .from("students")
+          .select(
+            `
           *,
           classes (*),
           parents (*)
         `,
-        )
-        .eq("id", id)
-        .maybeSingle();
+          )
+          .order("id")
+          .range(from, to),
+      "student findAll",
+    );
 
-      if (error) throw fromSupabaseError("student lookup", error);
-      if (!data) return null;
-      return mapSupabaseStudent(data as SupabaseStudentRow);
-    }
+    if (!data) return [];
+    return data.map((row) => mapSupabaseStudent(row as SupabaseStudentRow));
+  },
 
-    const s = memoryDb.students.find((s) => s.id === id);
-    if (!s) return null;
+  async findById(id: string): Promise<PopulatedStudent | null> {
+    const { data, error } = await supabase
+      .from("students")
+      .select(
+        `
+          *,
+          classes (*),
+          parents (*)
+        `,
+      )
+      .eq("id", id)
+      .maybeSingle();
 
-    const cls = memoryDb.classes.find((c) => c.id === s.classId);
-    const parent = memoryDb.parents.find((p) => p.id === s.parentId);
-
-    if (!cls || !parent) {
-      throw new Error(`Data integrity error for student ${s.id}`);
-    }
-
-    return {
-      ...s,
-      class: cls,
-      parent: parent,
-    };
+    if (error) throw fromSupabaseError("student lookup", error);
+    if (!data) return null;
+    return mapSupabaseStudent(data as SupabaseStudentRow);
   },
 };

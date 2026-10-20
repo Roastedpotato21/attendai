@@ -15,6 +15,7 @@ async function main() {
     databaseDir: dbDir,
     user: "postgres",
     password: "password",
+    initdbFlags: ["--encoding=UTF8"],
   });
 
   console.log("1. Initializing and starting EmbeddedPostgres...");
@@ -69,7 +70,11 @@ async function main() {
   await client.query(`CREATE ROLE anon NOLOGIN;`);
   await client.query(`CREATE ROLE service_role NOLOGIN;`);
 
-  console.log("2. Running migrations 00000 through 00009...");
+  // Minimal Storage catalog to exercise the real private-bucket policies.
+  await client.query(
+    "CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text PRIMARY KEY,name text,public boolean NOT NULL DEFAULT false,file_size_limit bigint,allowed_mime_types text[]); CREATE TABLE storage.objects(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),bucket_id text REFERENCES storage.buckets(id),name text UNIQUE,created_at timestamptz DEFAULT now(),metadata jsonb DEFAULT '{}'); ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; GRANT USAGE ON SCHEMA storage TO anon,authenticated,service_role; GRANT ALL ON storage.buckets,storage.objects TO anon,authenticated,service_role;",
+  );
+  console.log("2. Running all additive migrations...");
   const migrationsDir = path.join(__dirname, "../supabase/migrations");
   const migrationFiles = fs
     .readdirSync(migrationsDir)
@@ -92,8 +97,8 @@ async function main() {
     GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO anon, authenticated;
   `);
 
-  console.log("3. Applying seed.sql...");
-  const seedSql = fs.readFileSync(path.join(__dirname, "../supabase/seed.sql"), "utf8");
+  console.log("3. Applying fixtures.sql...");
+  const seedSql = fs.readFileSync(path.join(__dirname, "../supabase/tests/fixtures.sql"), "utf8");
   await client.query(seedSql);
   // Existing seeded identities are treated as accepted in legacy behavior tests.
   await client.query(`
@@ -101,7 +106,15 @@ async function main() {
     SELECT u.id, v.id, 'access_gate' FROM auth.users u CROSS JOIN public.policy_versions v
     WHERE v.active ON CONFLICT DO NOTHING;
   `);
-  console.log("  ✓ seed.sql applied successfully");
+  console.log("  ✓ fixtures.sql applied successfully");
+
+  await client.query(
+    fs.readFileSync(
+      path.join(__dirname, "../supabase/verification/audit_production_data.sql"),
+      "utf8",
+    ),
+  );
+  console.log("  ✓ production audit runs as a read-only transaction against the migrated schema");
 
   console.log("4. Verifying staff invitation lifecycle...");
   // The profile trigger deliberately assigns a neutral legacy profile role.
@@ -216,151 +229,8 @@ async function main() {
     "  ✓ invitation activation, tenant role resolution, suspension/revocation, and student rejection passed",
   );
 
-  console.log("5. Verifying first-admin institution onboarding...");
-  const onboardingAuthId = "00000000-0000-4000-8000-000000000089";
-  await client.query(
-    `
-    INSERT INTO auth.users (id, email, raw_user_meta_data)
-    VALUES (
-      $1,
-      'first-admin@test.invalid',
-      '{"name":"First Administrator","onboarding_intent":"new_institution_admin","onboarding_institution_name":"Onboarding Academy","onboarding_institution_code":"onboarding-academy"}'::jsonb
-    )
-    ON CONFLICT (id) DO NOTHING;
-  `,
-    [onboardingAuthId],
-  );
-  await client.query(`SET ROLE authenticated;`);
-  await client.query(`SELECT set_config('request.jwt.claim.sub', '${onboardingAuthId}', false);`);
-  try {
-    await client.query(`SELECT public.provision_my_new_institution();`);
-    throw new Error("Onboarding bypassed policy acceptance");
-  } catch (error) {
-    if (error.message === "Onboarding bypassed policy acceptance" || error.code !== "42501")
-      throw error;
-  }
-  const policyIds = await client.query(`SELECT public.my_policy_status() AS policies`);
-  const termsId = policyIds.rows[0]?.policies?.find((row) => row.type === "terms")?.id;
-  const privacyId = policyIds.rows[0]?.policies?.find((row) => row.type === "privacy")?.id;
-  if (!termsId || !privacyId) throw new Error("Required policies are missing");
-  await client.query(`SELECT public.accept_current_policies($1,$2,'signup')`, [termsId, privacyId]);
-  const policyAccepted = await client.query(`SELECT public.my_policy_status() AS policies`);
-  if (!policyAccepted.rows[0]?.policies?.every((row) => row.accepted))
-    throw new Error("Versioned policy acceptance was not persisted");
-  const onboarding = await client.query(
-    `SELECT public.provision_my_new_institution() AS institution_id;`,
-  );
-  const onboardingInstitutionId = onboarding.rows[0]?.institution_id;
-  if (!onboardingInstitutionId)
-    throw new Error("First-admin onboarding did not create an institution");
-  const onboardingAccess = await client.query(
-    `
-    SELECT public.has_institution_role($1, ARRAY['admin']::user_role[]) AS allowed,
-           (SELECT status FROM public.profile_institutions WHERE profile_id = $2 AND institution_id = $1) AS membership_status,
-           (SELECT count(*)::int FROM public.profile_roles WHERE profile_id = $2 AND institution_id = $1 AND role_code = 'admin') AS admin_roles;
-  `,
-    [onboardingInstitutionId, onboardingAuthId],
-  );
-  if (
-    !onboardingAccess.rows[0]?.allowed ||
-    onboardingAccess.rows[0]?.membership_status !== "active" ||
-    onboardingAccess.rows[0]?.admin_roles !== 1
-  ) {
-    throw new Error("First-admin onboarding did not create one active admin membership");
-  }
-  const onboardingRetry = await client.query(
-    `SELECT public.provision_my_new_institution() AS institution_id;`,
-  );
-  if (onboardingRetry.rows[0]?.institution_id !== onboardingInstitutionId) {
-    throw new Error("First-admin onboarding was not idempotent");
-  }
-  await client.query(`RESET ROLE;`);
-  await client.query(
-    `UPDATE public.policy_versions SET active = false WHERE policy_type = 'terms'`,
-  );
-  await client.query(`INSERT INTO public.policy_versions(policy_type,version,content_revision,active)
-    VALUES ('terms','test-next-version','test-next-version',true)`);
-  await client.query(`SET ROLE authenticated;`);
-  const reconsent = await client.query(`SELECT public.my_policy_status() AS policies`);
-  if (reconsent.rows[0]?.policies?.find((row) => row.type === "terms")?.accepted !== false)
-    throw new Error("New policy version did not trigger re-consent");
-  try {
-    await client.query(`SELECT public.provision_my_new_institution()`);
-    throw new Error("Existing user bypassed re-consent");
-  } catch (error) {
-    if (error.message === "Existing user bypassed re-consent" || error.code !== "42501")
-      throw error;
-  }
-  await client.query(`RESET ROLE;`);
-  await client.query(
-    `UPDATE public.policy_versions SET active = false WHERE version = 'test-next-version'`,
-  );
-  await client.query(`UPDATE public.policy_versions SET active = true WHERE id = $1`, [termsId]);
-
-  const unverifiedAuthId = "00000000-0000-4000-8000-000000000090";
-  await client.query(
-    `
-    INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)
-    VALUES (
-      $1,
-      'unverified-admin@test.invalid',
-      NULL,
-      '{"name":"Unverified Administrator","onboarding_intent":"new_institution_admin","onboarding_institution_name":"Unverified Academy","onboarding_institution_code":"unverified-academy"}'::jsonb
-    )
-    ON CONFLICT (id) DO NOTHING;
-  `,
-    [unverifiedAuthId],
-  );
-  await client.query(`SET ROLE authenticated;`);
-  await client.query(`SELECT set_config('request.jwt.claim.sub', '${unverifiedAuthId}', false);`);
-  await client.query(`SELECT public.accept_current_policies($1,$2,'signup')`, [termsId, privacyId]);
-  try {
-    await client.query(`SELECT public.provision_my_new_institution();`);
-    throw new Error("Unverified email created an institution");
-  } catch (error) {
-    if (error.message === "Unverified email created an institution") throw error;
-    if (error.code !== "42501") throw error;
-  }
-  await client.query(`RESET ROLE;`);
-
-  const studentAuthId = "00000000-0000-4000-8000-000000000091";
-  await client.query(
-    `
-    INSERT INTO auth.users (id, email, raw_user_meta_data)
-    VALUES (
-      $1,
-      'student-onboarding@test.invalid',
-      '{"name":"Student Identity","onboarding_intent":"new_institution_admin","onboarding_institution_name":"Blocked Academy","onboarding_institution_code":"blocked-academy"}'::jsonb
-    )
-    ON CONFLICT (id) DO NOTHING;
-  `,
-    [studentAuthId],
-  );
-  const studentInstitution = await client.query(`SELECT id FROM public.institutions LIMIT 1;`);
-  await client.query(
-    `INSERT INTO public.profile_institutions (profile_id, institution_id, status)
-     VALUES ($1, $2, 'active');`,
-    [studentAuthId, studentInstitution.rows[0].id],
-  );
-  await client.query(
-    `INSERT INTO public.profile_roles (profile_id, institution_id, role_code)
-     VALUES ($1, $2, 'student');`,
-    [studentAuthId, studentInstitution.rows[0].id],
-  );
-  await client.query(`SET ROLE authenticated;`);
-  await client.query(`SELECT set_config('request.jwt.claim.sub', '${studentAuthId}', false);`);
-  try {
-    await client.query(`SELECT public.provision_my_new_institution();`);
-    throw new Error("Student identity created an institution");
-  } catch (error) {
-    if (error.message === "Student identity created an institution") throw error;
-    if (error.code !== "42501") throw error;
-  }
-  await client.query(`RESET ROLE;`);
-  await client.query(`SELECT set_config('request.jwt.claim.sub', '', false);`);
-  console.log(
-    "  ✓ verified first admin, idempotence, email verification, and student rejection passed",
-  );
+  console.log("5. Verifying reviewed institution onboarding...");
+  await require("./verify-institution-workflow.cjs")(client);
 
   console.log("6. Running Phase 2 test suite...");
   // Legacy database fixtures create additional Auth identities. Treat those

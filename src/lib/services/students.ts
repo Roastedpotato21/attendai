@@ -3,11 +3,24 @@
  *
  * Directs all reads to the hardened studentRepository.
  * In Supabase mode, queries Supabase and throws typed database errors.
- * In explicit mock mode, uses memoryDb.
  */
 
 import type { KPIs, Student } from "@/lib/types";
-import { studentRepository } from "../db/repositories";
+import { format } from "date-fns";
+import {
+  acceptedMessage,
+  isSimulatedCommunication,
+  attendancePercentage,
+  recordsForDate,
+  todayDate,
+  studentHistoryMetrics,
+} from "./record-metrics";
+import {
+  studentRepository,
+  attendanceRepository,
+  communicationRepository,
+  escalationRepository,
+} from "../db/repositories";
 
 export interface StudentService {
   getAll(): Promise<Student[]>;
@@ -18,7 +31,15 @@ export interface StudentService {
 
 export const studentService: StudentService = {
   async getAll(): Promise<Student[]> {
-    const populated = await studentRepository.findAll();
+    const [populated, sessions, records] = await Promise.all([
+      studentRepository.findAll(),
+      attendanceRepository.findAllSessions(),
+      attendanceRepository.findAllRecords(),
+    ]);
+    const todayRecords = recordsForDate(sessions, records, todayDate());
+    const statusByStudent = new Map(
+      todayRecords.map((record) => [record.studentId, record.status]),
+    );
     return populated.map((s) => ({
       id: s.id,
       name: s.name,
@@ -28,53 +49,53 @@ export const studentService: StudentService = {
       parentName: s.parent.name,
       parentPhone: s.parent.phone,
       language: s.parent.language,
-      attendanceRate: s.attendanceRate,
-      consecutiveAbsences: s.consecutiveAbsences,
-      status: s.status,
-      risk: s.risk,
+      ...studentHistoryMetrics(s.id, sessions, records),
+      status: statusByStudent.get(s.id) ?? "unmarked",
     }));
   },
 
   async getById(id: string): Promise<Student | undefined> {
-    const s = await studentRepository.findById(id);
-    if (!s) return undefined;
-    return {
-      id: s.id,
-      name: s.name,
-      roll: s.roll,
-      className: s.class.name,
-      section: s.class.section,
-      parentName: s.parent.name,
-      parentPhone: s.parent.phone,
-      language: s.parent.language,
-      attendanceRate: s.attendanceRate,
-      consecutiveAbsences: s.consecutiveAbsences,
-      status: s.status,
-      risk: s.risk,
-    };
+    return (await this.getAll()).find((student) => student.id === id);
   },
 
   async getAbsentToday(): Promise<Student[]> {
-    const all = await this.getAll();
-    return all.filter((s) => s.status === "absent");
+    return (await this.getAll()).filter((student) => student.status === "absent");
   },
 
   async getKPIs(): Promise<KPIs> {
-    const all = await this.getAll();
-    const total = all.length;
-    const absent = all.filter((s) => s.status === "absent").length;
-    const present = total - absent;
-    const attendanceToday = total > 0 ? Math.round((present / total) * 100) : 100;
-
+    const [sessions, records, communications, escalations] = await Promise.all([
+      attendanceRepository.findAllSessions(),
+      attendanceRepository.findAllRecords(),
+      communicationRepository.findAll(),
+      escalationRepository.findAll(),
+    ]);
+    const today = todayDate();
+    const marked = recordsForDate(sessions, records, today);
+    const todayCommunications = communications.filter(
+      (record) =>
+        !isSimulatedCommunication(record) &&
+        format(new Date(record.processedAt ?? record.createdAt), "yyyy-MM-dd") === today,
+    );
+    const calls = todayCommunications.filter((record) => record.type === "voice");
+    const messages = todayCommunications.filter(acceptedMessage);
     return {
-      attendanceToday,
-      absentToday: absent,
-      callsToday: 18,
-      callSuccess: 94,
-      messagesSent: 42,
-      openEscalations: 3,
-      parentsReached: 38,
-      avgResponseMin: 4.2,
+      attendanceToday: attendancePercentage(marked),
+      absentToday: new Set(
+        marked.filter((record) => record.status === "absent").map((record) => record.studentId),
+      ).size,
+      callsToday: calls.length,
+      callSuccess: calls.length
+        ? Math.round(
+            (calls.filter((record) => record.callStatus === "completed" && record.providerMessageId)
+              .length /
+              calls.length) *
+              100,
+          )
+        : null,
+      messagesSent: messages.length,
+      openEscalations: escalations.filter((record) => record.status !== "resolved").length,
+      parentsReached: new Set(messages.map((record) => record.parentId)).size,
+      avgResponseMin: null,
     };
   },
 };

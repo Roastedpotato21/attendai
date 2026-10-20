@@ -2,7 +2,7 @@
  * Central domain types for AttendAI.
  *
  * Every type used across routes and services lives here so that domain models
- * are decoupled from mock-data generation and from any future API layer.
+ * are shared by the data services and the UI.
  */
 
 import type { SUPPORTED_LANGUAGES } from "@/lib/config";
@@ -29,10 +29,10 @@ export type Student = {
   parentName: string;
   parentPhone: string;
   language: Language;
-  attendanceRate: number;
+  attendanceRate: number | null;
   consecutiveAbsences: number;
   status: StudentStatus;
-  risk: RiskLevel;
+  risk: RiskLevel | "unknown";
 };
 
 export type AttendanceTrend = {
@@ -103,8 +103,9 @@ export type LanguageSplit = {
 // Voice Calls
 // ---------------------------------------------------------------------------
 
-export type CallStatus = "completed" | "no-answer" | "failed" | "in-progress" | "scheduled";
-export type CallSentiment = "cooperative" | "concerned" | "neutral" | "unreachable";
+export type CallStatus =
+  "simulated" | "unconfirmed" | "completed" | "no-answer" | "failed" | "in-progress" | "scheduled";
+export type CallSentiment = "unknown" | "cooperative" | "concerned" | "neutral" | "unreachable";
 
 export type CallRecord = {
   id: string;
@@ -141,6 +142,7 @@ export type AuthUser = {
 
 export type MessageChannel = "SMS" | "WhatsApp" | "Push";
 export type MessageStatus =
+  | "simulated"
   | "queued"
   | "delivered"
   | "read"
@@ -287,14 +289,14 @@ export type ClassAIInsight = {
 // ---------------------------------------------------------------------------
 
 export type KPIs = {
-  attendanceToday: number;
+  attendanceToday: number | null;
   absentToday: number;
   callsToday: number;
-  callSuccess: number;
+  callSuccess: number | null;
   messagesSent: number;
   openEscalations: number;
   parentsReached: number;
-  avgResponseMin: number;
+  avgResponseMin: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -331,7 +333,7 @@ export type RolesMatrixRow = {
 // ---------------------------------------------------------------------------
 
 export type StudentDashboardData = {
-  overallPercentage: number;
+  overallPercentage: number | null;
   presentCount: number;
   absentCount: number;
   lateCount: number;

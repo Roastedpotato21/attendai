@@ -18,8 +18,8 @@ function StudentDashboard() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["student-dashboard", user?.studentId],
     queryFn: () => {
-      // For mock users that don't have a studentId, fallback to a mock ID
-      const studentId = user?.studentId || "student-123";
+      const studentId = user?.studentId;
+      if (!studentId) throw new Error("No student profile is linked to this account.");
       return attendanceService.getStudentDashboard(studentId);
     },
     enabled: !!user,
@@ -74,7 +74,7 @@ function StudentDashboard() {
 
   if (!data) return null;
 
-  const isLowAttendance = data.overallPercentage < 75;
+  const isLowAttendance = data.overallPercentage !== null && data.overallPercentage < 75;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -97,10 +97,16 @@ function StudentDashboard() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Overall Attendance"
-          value={`${data.overallPercentage}%`}
+          value={data.overallPercentage === null ? "No records" : `${data.overallPercentage}%`}
           icon={<CalendarCheck className="h-4 w-4 text-primary" />}
-          delta={isLowAttendance ? "Needs Improvement" : "On Track"}
-          trend={isLowAttendance ? "down" : "up"}
+          delta={
+            data.overallPercentage === null
+              ? "No attendance recorded"
+              : isLowAttendance
+                ? "Needs Improvement"
+                : "On Track"
+          }
+          trend={data.overallPercentage === null ? "flat" : isLowAttendance ? "down" : "up"}
         />
         <StatCard
           label="Classes Present"

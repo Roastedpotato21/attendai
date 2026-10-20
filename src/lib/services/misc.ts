@@ -1,45 +1,28 @@
-/**
- * Miscellaneous data-access services (Insights, Integrations, Roles).
- */
-
 import type { AIInsight, Integration, RolesMatrixRow } from "@/lib/types";
-import { aiInsights, integrations, rolesMatrix } from "@/lib/mock-data";
 
 export interface InsightsService {
   getAll(): Promise<AIInsight[]>;
 }
-
 export interface IntegrationsService {
   getAll(): Promise<Integration[]>;
 }
-
 export interface RolesService {
   getMatrix(): Promise<RolesMatrixRow[]>;
 }
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-export const mockInsightsService: InsightsService = {
-  async getAll() {
-    await delay(50);
-    return aiInsights;
+// These modules have no persisted data source yet. Never substitute demo records.
+export const insightsService = {
+  async getAll(): Promise<AIInsight[]> {
+    return [];
   },
 };
-
-export const mockIntegrationsService: IntegrationsService = {
-  async getAll() {
-    await delay(50);
-    return integrations;
+export const integrationsService = {
+  async getAll(): Promise<Integration[]> {
+    return [];
   },
 };
-
-export const mockRolesService: RolesService = {
-  async getMatrix() {
-    await delay(50);
-    return rolesMatrix;
+export const rolesService = {
+  async getMatrix(): Promise<RolesMatrixRow[]> {
+    return [];
   },
 };
-
-export const insightsService: InsightsService = mockInsightsService;
-export const integrationsService: IntegrationsService = mockIntegrationsService;
-export const rolesService: RolesService = mockRolesService;

@@ -505,15 +505,15 @@ function AttendancePage() {
                     <div className="space-y-4">
                       <QrCode className="mx-auto h-12 w-12 text-muted-foreground" />
                       <div>
-                        <h3 className="font-semibold">Start Secure QR Session</h3>
+                        <h3 className="font-semibold">QR attendance unavailable</h3>
                         <p className="text-sm text-muted-foreground">
-                          Students will scan the code to check in. Proximity and network validation
-                          enforced.
+                          Student identity and proximity verification are not enabled. Use faculty
+                          marking to record attendance.
                         </p>
                       </div>
-                      <Button onClick={startQRSession} disabled={isStartingQR}>
+                      <Button onClick={startQRSession} disabled>
                         <Play className="mr-2 h-4 w-4" />
-                        Start Session (5 mins)
+                        Unavailable
                       </Button>
                     </div>
                   ) : (
@@ -628,7 +628,9 @@ function AttendancePage() {
                           {s.parentPhone} · {s.language}
                         </p>
                       </TableCell>
-                      <TableCell>{s.attendanceRate}%</TableCell>
+                      <TableCell>
+                        {s.attendanceRate === null ? "No records" : `${s.attendanceRate}%`}
+                      </TableCell>
                       <TableCell>
                         <StatusPill tone={toneForStatus(s.status)}>{s.status}</StatusPill>
                       </TableCell>

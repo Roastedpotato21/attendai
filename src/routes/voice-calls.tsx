@@ -73,13 +73,9 @@ function VoiceCallsPage() {
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
         title="AI Voice Calls"
-        description="Simulation history. Conversational multilingual voice is disabled until a speech-to-text and constrained AI runtime is provisioned."
+        description="Recorded call history. Manual voice outreach is currently unavailable."
         actions={
-          <Button
-            onClick={() =>
-              toast.success("Call batch queued for all unreached parents (simulation)")
-            }
-          >
+          <Button onClick={() => toast.info("Manual call batches are not available.")}>
             <PhoneCall className="mr-2 h-4 w-4" />
             Start call batch
           </Button>
@@ -94,20 +90,19 @@ function VoiceCallsPage() {
             icon={<PhoneCall className="h-5 w-5" />}
           />
           <StatCard
-            label="Answered"
-            value={`${kpis.callSuccess}%`}
-            delta="+4.2% w/w"
+            label="Completed"
+            value={kpis.callSuccess === null ? "No calls" : `${kpis.callSuccess}%`}
             icon={<CheckCircle2 className="h-5 w-5" />}
           />
           <StatCard
-            label="Languages live"
-            value="6"
-            hint="EN · TE · HI · TA · KN · UR"
+            label="Voice outreach"
+            value="Unavailable"
+
             icon={<Languages className="h-5 w-5" />}
           />
           <StatCard
             label="Retries pending"
-            value="17"
+            value={String(calls.filter((call) => call.status === "scheduled").length)}
             trend="down"
             icon={<RefreshCw className="h-5 w-5" />}
           />
@@ -200,7 +195,7 @@ function VoiceCallsPage() {
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => toast.success("Faculty notified with AI summary")}
+                  onClick={() => toast.info("Faculty summary notifications are not available.")}
                 >
                   Notify faculty
                 </Button>

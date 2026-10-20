@@ -26,6 +26,8 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   // Public routes (no auth required)
   "/login": { public: true },
   "/create-account": { public: true },
+  "/institution-verification": { public: true },
+  "/institution-review": { public: true },
   "/accept-invite": { public: true },
   "/check-in": { public: true },
   "/guardian-notifications": { public: true },

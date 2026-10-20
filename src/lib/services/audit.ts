@@ -16,11 +16,8 @@ export interface AuditService {
   ): Promise<void>;
 }
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-export const mockAuditService: AuditService = {
+export const auditService: AuditService = {
   async getAll() {
-    await delay(300);
     const dbLogs = await auditRepository.findAll();
 
     // We fetch all users to do mapping since we don't have a joined view yet
@@ -46,7 +43,7 @@ export const mockAuditService: AuditService = {
     target: string,
     severity: AuditLog["severity"],
     actorId,
-    ip = "127.0.0.1",
+    ip = "Unknown",
   ) {
     await auditRepository.createLog({
       actorId: actorId ?? null,
@@ -57,5 +54,3 @@ export const mockAuditService: AuditService = {
     });
   },
 };
-
-export const auditService: AuditService = mockAuditService;

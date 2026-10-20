@@ -160,9 +160,9 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border">
         {!collapsed ? (
           <div className="rounded-lg bg-sidebar-accent p-3">
-            <p className="text-xs font-medium text-sidebar-accent-foreground">Simulation mode</p>
+            <p className="text-xs font-medium text-sidebar-accent-foreground">AttendAI</p>
             <p className="mt-1 text-[11px] leading-snug text-sidebar-foreground/60">
-              Voice, SMS and WhatsApp providers are mocked. Connect them under Integrations.
+              Attendance and guardian notifications for your institution.
             </p>
           </div>
         ) : (

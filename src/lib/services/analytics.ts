@@ -15,12 +15,8 @@ export interface AnalyticsService {
   }): Promise<AnalyticsDashboardData>;
 }
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-export const mockAnalyticsService: AnalyticsService = {
+export const analyticsService: AnalyticsService = {
   async getDashboardData(filters = {}) {
-    await delay(200);
-
     const allSessions = await attendanceRepository.findAllSessions();
     const allRecords = await attendanceRepository.findAllRecords();
     const allClasses = await classRepository.findAll();
@@ -141,5 +137,3 @@ export const mockAnalyticsService: AnalyticsService = {
     };
   },
 };
-
-export const analyticsService: AnalyticsService = mockAnalyticsService;

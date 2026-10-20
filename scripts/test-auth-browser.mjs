@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
 const baseUrl = process.argv[2] ?? "http://localhost:8081";
+assert.ok(
+  ["127.0.0.1", "localhost", "[::1]"].includes(new URL(baseUrl).hostname),
+  "Browser fixtures must run against a local preview.",
+);
 const debugPort = process.argv[3] ?? "9222";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -98,51 +102,18 @@ async function waitForLoginForm(client, description = "hydrated login form") {
 }
 
 async function fill(client, selector, value) {
-  const point = await client.evaluate(`(() => {
-    const input = document.querySelector(${JSON.stringify(selector)});
-    if (!(input instanceof HTMLInputElement)) throw new Error("Missing input");
-    const rect = input.getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-  })()`);
-  await client.call("Input.dispatchMouseEvent", {
-    type: "mousePressed",
-    x: point.x,
-    y: point.y,
-    button: "left",
-    clickCount: 1,
-  });
-  await client.call("Input.dispatchMouseEvent", {
-    type: "mouseReleased",
-    x: point.x,
-    y: point.y,
-    button: "left",
-    clickCount: 1,
-  });
-  await client.call("Input.dispatchKeyEvent", {
-    type: "rawKeyDown",
-    key: "a",
-    code: "KeyA",
-    modifiers: 2,
-  });
-  await client.call("Input.dispatchKeyEvent", { type: "keyUp", key: "a", code: "KeyA" });
-  await client.call("Input.dispatchKeyEvent", {
-    type: "rawKeyDown",
-    key: "Backspace",
-    code: "Backspace",
-  });
-  await client.call("Input.dispatchKeyEvent", {
-    type: "keyUp",
-    key: "Backspace",
-    code: "Backspace",
-  });
+  await client.evaluate(
+    "(() => { const input = document.querySelector(" +
+      JSON.stringify(selector) +
+      "); if (!(input instanceof HTMLInputElement)) throw new Error('Missing input'); input.scrollIntoView({block:'center'}); input.focus(); input.select(); })()",
+  );
   await client.call("Input.insertText", { text: value });
   await waitFor(
     client,
-    `document.querySelector(${JSON.stringify(selector)})?.value === ${JSON.stringify(value)}`,
-    `${selector} value`,
+    "document.querySelector(" + JSON.stringify(selector) + ")?.value === " + JSON.stringify(value),
+    selector + " value",
   );
 }
-
 async function submitLogin(client, email, password) {
   await fill(client, "#email", email);
   await fill(client, "#password", password);
@@ -167,160 +138,249 @@ async function submitLogin(client, email, password) {
   });
 }
 
+// Browser fixtures intercept Supabase requests; no synthetic production writes.
+function installSupabaseFixture() {
+  const realFetch = window.fetch.bind(window);
+  window.__fixtureRequests = [];
+  const user = {
+    id: "90000000-0000-4000-8000-000000000001",
+    aud: "authenticated",
+    role: "authenticated",
+    email: "applicant@fixture.invalid",
+    email_confirmed_at: "2020-01-01T00:00:00Z",
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { name: "Fixture Representative" },
+    identities: [{ id: "fixture-identity", provider: "email" }],
+    created_at: "2020-01-01T00:00:00Z",
+  };
+  const session = () => ({
+    user,
+    token_type: "bearer",
+    expires_in: 3600,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    access_token:
+      "eyJhbGciOiJIUzI1NiJ9." +
+      btoa(
+        JSON.stringify({
+          sub: user.id,
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          role: "authenticated",
+        }),
+      ) +
+      ".fixture",
+    refresh_token: "fixture-refresh-token",
+  });
+  const application = {
+    id: "90000000-0000-4000-8000-000000000010",
+    institution_id: "90000000-0000-4000-8000-000000000020",
+    institution_name: "Fictional Browser College",
+    institution_type: "College",
+    state: "Fixture State",
+    city: "Fixture City",
+    applicant_name: "Fixture Representative",
+    account_email: user.email,
+    applicant_phone: "+919000000001",
+    leadership_role: "secretary",
+    designation: "Authorized Secretary",
+    status: "pending_manual_review",
+    registry_confidence: "needs_review",
+    matched_sources: [],
+    registry_id: null,
+    decision_reason: null,
+    revision: 1,
+    submitted_at: "2020-01-01T00:00:00Z",
+  };
+  window.fetch = async (input, init = {}) => {
+    const url = new URL(typeof input === "string" ? input : input.url, location.origin);
+    const endpoint = url.pathname.match(/\/(auth|rest|storage)\/v1\//);
+    if (!endpoint) return realFetch(input, init);
+    const path = url.pathname.slice(endpoint.index);
+    window.__fixtureRequests.push(path);
+    const body = init.body ? JSON.parse(init.body) : {};
+    const json = (v, status = 200) =>
+      new Response(JSON.stringify(v), { status, headers: { "Content-Type": "application/json" } });
+    if (path === "/auth/v1/user") return json(user);
+    if (path === "/auth/v1/logout") return json({});
+    if (path === "/auth/v1/signup")
+      return json({ user: { ...user, email_confirmed_at: null }, session: null });
+    if (path === "/auth/v1/token") {
+      if (body.email !== user.email || body.password !== "fixture-pending-password")
+        return json({ code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
+      return json(session());
+    }
+    if (path.endsWith("/rpc/search_institution_registry")) {
+      if (body.p_query.includes("Unlisted")) return json([]);
+      return json(
+        ["Fixture State", "Other Fixture State"].map((state, i) => ({
+          id: "90000000-0000-4000-8000-00000000003" + i,
+          canonical_name: "Fictional Browser College",
+          state,
+          institution_type: "College",
+          aishe_code: "C-FIXTURE-" + i,
+          city: "Fixture City",
+          official_website: null,
+          sources: ["aishe"],
+        })),
+      );
+    }
+    if (path.endsWith("/rpc/my_institution_verification_access"))
+      return json({
+        allowed: true,
+        can_apply: false,
+        reviewer: false,
+        application_id: application.id,
+        status: application.status,
+      });
+    if (path.endsWith("/rpc/is_verification_reviewer")) return json(false);
+    if (path.endsWith("/rpc/my_policy_status"))
+      return json(
+        ["terms", "privacy"].map((type, i) => ({
+          id: "fixture-policy-" + i,
+          type,
+          version: "2026-10-15.1",
+          accepted: true,
+        })),
+      );
+    if (path === "/rest/v1/profiles")
+      return json({
+        id: user.id,
+        name: "Fixture Representative",
+        email: user.email,
+        status: "active",
+      });
+    if (path === "/rest/v1/profile_institutions") return json([]);
+    if (path === "/rest/v1/institution_verification_applications") return json(application);
+    if (path === "/rest/v1/institution_verification_evidence") return json([]);
+    throw new Error("Unconfigured isolated Supabase request: " + path);
+  };
+}
 const page = await openDebugPage();
 const client = new CdpClient(page.webSocketDebuggerUrl);
-
+const clickButton = async (text) =>
+  client.evaluate(
+    "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes(" +
+      JSON.stringify(text) +
+      ")).click()",
+  );
 try {
   await client.connect();
   await client.call("Page.enable");
   await client.call("Runtime.enable");
   await client.call("Page.addScriptToEvaluateOnNewDocument", {
-    source: `
-      new MutationObserver(() => {
-        if (document.body?.innerText.includes("Good morning")) {
-          sessionStorage.setItem("__attendai_dashboard_seen", "1");
-        }
-      }).observe(document, { subtree: true, childList: true, characterData: true });
-    `,
+    source: "(" + installSupabaseFixture.toString() + ")();",
   });
-
-  await navigate(client, "/");
-  await client.evaluate(`localStorage.clear(); sessionStorage.clear()`);
+  await navigate(client, "/login");
+  await client.evaluate("localStorage.clear();sessionStorage.clear()");
   await navigate(client, "/");
   await waitForPath(client, "/login");
   await waitForLoginForm(client);
-  const fresh = await client.evaluate(`({
-    email: document.querySelector("#email")?.value,
-    password: document.querySelector("#password")?.value,
-    emailAutocomplete: document.querySelector("#email")?.autocomplete,
-    passwordAutocomplete: document.querySelector("#password")?.autocomplete,
-    dashboardSeen: sessionStorage.getItem("__attendai_dashboard_seen"),
-    overlay: Boolean(document.querySelector(".vite-error-overlay, #webpack-dev-server-client-overlay")),
-    bodyLength: document.body.innerText.trim().length,
-  })`);
-  assert.equal(fresh.email, "");
-  assert.equal(fresh.password, "");
-  assert.equal(fresh.emailAutocomplete, "email");
-  assert.equal(fresh.passwordAutocomplete, "current-password");
-  assert.equal(fresh.dashboardSeen, null);
-  assert.equal(fresh.overlay, false);
-  assert.ok(fresh.bodyLength > 0);
-
-  await client.evaluate(`document.querySelector('a[href="/create-account"]')?.click()`);
-  await waitForPath(client, "/create-account");
+  assert.deepEqual(
+    await client.evaluate(
+      "({email:document.querySelector('#email').value,password:document.querySelector('#password').value})",
+    ),
+    { email: "", password: "" },
+  );
+  await navigate(client, "/create-account");
   await waitFor(
     client,
-    `Boolean(document.querySelector("#full-name") && document.querySelector("#work-email") && document.querySelector("#institution-name") && document.querySelector("#institution-code") && document.querySelector("#new-password") && document.querySelector("#confirm-password"))`,
-    "new institution account form",
+    "Boolean(document.querySelector('#institution-search'))",
+    "registry search",
   );
-  const createAccountState = await client.evaluate(`({
-    body: document.body.innerText,
-    roleInputs: document.querySelectorAll('input[type="radio"], select').length,
-    overlay: Boolean(document.querySelector(".vite-error-overlay, #webpack-dev-server-client-overlay")),
-  })`);
-  assert.equal(createAccountState.body.includes("Create your AttendAI institution account"), true);
-  assert.equal(createAccountState.body.includes("Faculty and staff are invited later."), true);
-  assert.equal(createAccountState.roleInputs, 0);
-  assert.equal(createAccountState.overlay, false);
-
-  await navigate(client, "/login");
-  await waitForLoginForm(client, "login form after create-account navigation");
-
-  await submitLogin(client, "nobody@example.invalid", "wrong-password");
-  await sleep(500);
-  const invalidState = await client.evaluate(`({
-    pathname: location.pathname,
-    body: document.body.innerText,
-    email: document.querySelector("#email")?.value,
-    passwordLength: document.querySelector("#password")?.value.length,
-  })`);
-  if (!invalidState.body.includes("Invalid email or password")) {
-    throw new Error(`Unexpected invalid-login state: ${JSON.stringify(invalidState)}`);
-  }
+  await fill(client, "#institution-search", "Fictional College");
+  await clickButton("Search official registry");
   await waitFor(
     client,
-    `document.body.innerText.includes("Invalid email or password")`,
-    "invalid-login error",
+    "document.body.innerText.includes('Several official records may match')",
+    "ambiguous official matches",
   );
-  assert.equal(await client.evaluate(`location.pathname`), "/login");
-
-  await navigate(client, "/login");
-  await waitForLoginForm(client, "login form for student rejection");
-  await submitLogin(client, "john.doe@student.edu", "student-password");
-  await waitFor(
-    client,
-    `document.body.innerText.includes("available only to administrators, faculty, and staff")`,
-    "student portal rejection",
-  );
-  assert.equal(await client.evaluate(`location.pathname`), "/login");
-
-  await navigate(client, "/login");
-  await waitForLoginForm(client);
-  await submitLogin(client, "admin@attendai.com", "account-a-password");
-  await waitForPath(client, "/");
-  await waitFor(client, `document.body.innerText.includes("Good morning")`, "Account A dashboard");
-  assert.equal(await client.evaluate(`document.body.innerText.includes("System Admin")`), true);
-
-  await client.call("Page.reload", { ignoreCache: true });
-  await waitForPath(client, "/");
-  await waitFor(client, `document.body.innerText.includes("Good morning")`, "restored dashboard");
-
-  await navigate(client, "/login");
-  await waitForPath(client, "/");
-  await waitFor(
-    client,
-    `Boolean(document.querySelector('button[title="Logout"]'))`,
-    "authenticated shell after login-route redirect",
-  );
-
-  await client.evaluate(`document.querySelector('button[title="Logout"]').click()`);
-  await waitForPath(client, "/login");
-  await waitForLoginForm(client, "login form after logout");
-  const afterLogout = await client.evaluate(`({
-    email: document.querySelector("#email")?.value,
-    password: document.querySelector("#password")?.value,
-    mockSession: localStorage.getItem("mock_auth_session"),
-  })`);
-  assert.deepEqual(afterLogout, { email: "", password: "", mockSession: null });
-
-  for (const path of [
-    "/dashboard",
-    "/attendance",
-    "/students",
-    "/analytics",
-    "/interventions",
-    "/messages",
-    "/voice-calls",
-  ]) {
-    await navigate(client, path);
-    await waitForPath(client, "/login");
-    assert.equal(await client.evaluate(`document.body.innerText.includes("Good morning")`), false);
-  }
-
-  await waitForLoginForm(client, "login form for Account B");
-  await submitLogin(client, "s.jenkins@attendai.com", "different-account-b-password");
-  await waitForPath(client, "/");
-  await waitFor(client, `document.body.innerText.includes("Good morning")`, "Account B dashboard");
+  await client.evaluate("document.querySelector('li button').click()");
+  await waitFor(client, "Boolean(document.querySelector('#full-name'))", "identity form");
   assert.equal(
-    await client.evaluate(`document.body.innerText.includes("Dr. Sarah Jenkins")`),
+    await client.evaluate("Boolean(document.querySelector('#institution-code'))"),
+    false,
+  );
+  assert.equal(
+    await client.evaluate(
+      "document.body.innerText.includes('It does not make you an institution administrator')",
+    ),
     true,
   );
-
-  console.log("Auth browser verification passed", {
-    freshLogin: true,
-    createAccountRoute: true,
-    noPublicRoleSelection: true,
-    emptyCredentials: true,
-    invalidCredentialsRejected: true,
-    studentAccountRejected: true,
-    accountALogin: true,
-    refreshRestored: true,
-    authenticatedLoginRedirected: true,
-    logoutClearedSession: true,
-    protectedRoutesChecked: 7,
-    accountBLogin: true,
-  });
+  await fill(client, "#full-name", "Fixture Representative");
+  await fill(client, "#work-email", "applicant@fixture.invalid");
+  await fill(client, "#new-password", "fixture-pending-password");
+  await fill(client, "#confirm-password", "fixture-pending-password");
+  await client.evaluate("document.querySelectorAll('input[type=checkbox]').forEach(e=>e.click())");
+  await client.evaluate("document.querySelector('button[type=submit]').click()");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Check your email')",
+    "email verification",
+  );
+  assert.equal(
+    await client.evaluate(
+      "window.__fixtureRequests.some(p=>p.includes('provision_my_new_institution'))",
+    ),
+    false,
+  );
+  await navigate(client, "/create-account");
+  await waitFor(client, "Boolean(document.querySelector('#institution-search'))", "manual search");
+  await fill(client, "#institution-search", "Unlisted Fixture");
+  await clickButton("Search official registry");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('does not mean your institution is invalid')",
+    "manual fallback",
+  );
+  await clickButton("Institution not found");
+  await waitFor(client, "Boolean(document.querySelector('#full-name'))", "manual applicant form");
+  await navigate(client, "/login");
+  await waitForLoginForm(client);
+  await submitLogin(client, "nobody@fixture.invalid", "wrong-password");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Invalid email or password')",
+    "invalid password",
+  );
+  await submitLogin(client, "applicant@fixture.invalid", "fixture-pending-password");
+  await waitForPath(client, "/institution-verification");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Pending verification')",
+    "pending status",
+  );
+  for (const path of ["/", "/students", "/faculty", "/attendance", "/messages", "/voice-calls"]) {
+    await navigate(client, path);
+    await waitForPath(client, "/institution-verification");
+    await waitFor(
+      client,
+      "document.body.innerText.includes('Pending verification')",
+      "pending URL gate",
+    );
+    assert.equal(await client.evaluate("Boolean(document.querySelector('aside'))"), false);
+  }
+  await navigate(client, "/institution-review");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Platform reviewer access required')",
+    "reviewer denial",
+  );
+  await navigate(client, "/privacy");
+  await waitFor(client, "document.body.innerText.includes('Privacy Policy')", "legal page");
+  await navigate(client, "/institution-verification");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Pending verification')",
+    "status reload",
+  );
+  await clickButton("Sign out");
+  await waitForPath(client, "/login");
+  await waitForLoginForm(client);
+  await navigate(client, "/attendance");
+  await waitForPath(client, "/login");
+  console.log(
+    "Auth browser checks passed: empty credentials; ambiguous registry search; manual fallback; identity-only signup; invalid password; pending login/reload; six URL gates; reviewer denial; legal access; logout. All Supabase responses used isolated browser fixtures.",
+  );
 } finally {
   client.close();
-  await fetch(`http://127.0.0.1:${debugPort}/json/close/${page.id}`).catch(() => undefined);
+  await fetch("http://127.0.0.1:" + debugPort + "/json/close/" + page.id).catch(() => undefined);
 }

@@ -2,6 +2,7 @@
  * Message data-access service.
  */
 
+import { messageDisplayStatus } from "./record-metrics";
 import type { MessageRecord } from "@/lib/types";
 import { communicationRepository, studentRepository, parentRepository } from "../db/repositories";
 
@@ -30,7 +31,7 @@ export const messageService: MessageService = {
             language: parent.language,
             template: c.templateId || "Absence alert",
             sentAt: c.processedAt || c.createdAt,
-            status: c.messageStatus || "queued",
+            status: messageDisplayStatus(c),
             body: c.body || "",
           };
         }

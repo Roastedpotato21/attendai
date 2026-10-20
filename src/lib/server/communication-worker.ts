@@ -425,6 +425,13 @@ export async function deliver(
         };
       }
       if (mode === "simulate") {
+        if (process.env["NODE_ENV"] === "production") {
+          return {
+            ok: false,
+            errorClass: "permanent",
+            message: "SMS simulation is disabled in production",
+          };
+        }
         return {
           ok: true,
           provider: "fast2sms-simulated",

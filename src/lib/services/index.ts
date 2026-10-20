@@ -2,7 +2,6 @@
  * Barrel export for all services.
  *
  * Route files should import from here rather than individual service files.
- * When swapping mock implementations for real ones, only this file changes.
  */
 
 export * from "./students";

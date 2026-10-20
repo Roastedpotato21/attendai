@@ -57,11 +57,11 @@ function LoginPage() {
     setError(null);
 
     try {
-      await loginWithPassword(email, password);
+      const staff = await loginWithPassword(email, password);
 
       // Validate but intentionally ignore deep links: staff always enter via the dashboard.
       void sanitizeRedirect(redirect);
-      await router.navigate({ to: "/" });
+      await router.navigate({ to: staff ? "/" : "/institution-verification" });
     } catch (loginError: unknown) {
       setError(loginError instanceof Error ? loginError.message : "Failed to log in.");
     } finally {

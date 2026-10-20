@@ -1,4 +1,5 @@
-import { memoryDb, hasDatabaseConnection, supabase } from "../connection";
+import { readAllRows } from "../pagination";
+import { supabase } from "../connection";
 import type { DbUser } from "../schema";
 import type { UserRole } from "@/lib/types";
 import { fromSupabaseError } from "../errors";
@@ -20,8 +21,6 @@ export type StaffAccessResolution =
 export const userRepository = {
   /** Resolve portal access from the authenticated identity and tenant-scoped grants. */
   async resolveStaffAccess(authUserId: string): Promise<StaffAccessResolution> {
-    if (!hasDatabaseConnection() || !supabase) throw new Error("Supabase mode is required");
-
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("id, name, email, status, student_id, created_at, updated_at")
@@ -45,6 +44,7 @@ export const userRepository = {
     const { data: institutions, error: institutionsError } = await supabase
       .from("institutions")
       .select("id")
+      .eq("status", "active")
       .in("id", membershipIds);
     if (institutionsError) throw fromSupabaseError("active institution lookup", institutionsError);
     const activeInstitutionIds = new Set(institutions?.map((institution) => institution.id));
@@ -82,72 +82,57 @@ export const userRepository = {
   },
 
   async findById(id: string): Promise<DbUser | null> {
-    if (hasDatabaseConnection() && supabase) {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", id).maybeSingle();
 
-      if (error) throw fromSupabaseError("profile lookup", error);
-      if (!data) return null;
-      return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        studentId: data.student_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    }
-
-    const user = memoryDb.users.find((u) => u.id === id);
-    return user || null;
+    if (error) throw fromSupabaseError("profile lookup", error);
+    if (!data) return null;
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      studentId: data.student_id,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
   },
 
   async findByEmail(email: string): Promise<DbUser | null> {
-    if (hasDatabaseConnection() && supabase) {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("email", email)
+      .maybeSingle();
 
-      if (error) throw fromSupabaseError("profile email lookup", error);
-      if (!data) return null;
-      return {
-        id: data.id,
-        name: data.name,
-        email: data.email,
-        role: data.role,
-        studentId: data.student_id,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    }
-
-    const user = memoryDb.users.find((u) => u.email === email);
-    return user || null;
+    if (error) throw fromSupabaseError("profile email lookup", error);
+    if (!data) return null;
+    return {
+      id: data.id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      studentId: data.student_id,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
   },
 
   async findAll(): Promise<DbUser[]> {
-    if (hasDatabaseConnection() && supabase) {
-      const { data, error } = await supabase.from("profiles").select("*");
-      if (error) throw fromSupabaseError("profile list", error);
-      if (!data) return [];
+    const data = await readAllRows(
+      (from, to) => supabase.from("profiles").select("*").order("id").range(from, to),
+      "user findAll",
+    );
 
-      return data.map((d) => ({
-        id: d.id,
-        name: d.name,
-        email: d.email,
-        role: d.role,
-        studentId: d.student_id,
-        createdAt: d.created_at,
-        updatedAt: d.updated_at,
-      }));
-    }
+    if (!data) return [];
 
-    return memoryDb.users;
+    return data.map((d) => ({
+      id: d.id,
+      name: d.name,
+      email: d.email,
+      role: d.role,
+      studentId: d.student_id,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+    }));
   },
 };

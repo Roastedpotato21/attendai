@@ -1,427 +1,254 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Building2 } from "lucide-react";
-
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-context";
+import { InstitutionSearch } from "@/components/auth/institution-search";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { hasDatabaseConnection, supabase } from "@/lib/db/connection";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/db/connection";
 import { normalizeAuthEmail, signUpErrorMessage } from "@/lib/auth-errors";
-import { acceptPolicies } from "@/lib/policy-acceptance";
-
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function normalizeInstitutionCode(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+import type { RegistryMatch } from "@/lib/institution-verification";
 
 export const Route = createFileRoute("/create-account")({
-  head: () => ({ meta: [{ title: "Create institution account — AttendAI" }] }),
+  head: () => ({ meta: [{ title: "Register an institution — AttendAI" }] }),
   component: CreateAccountPage,
 });
-
 function CreateAccountPage() {
   const router = useRouter();
-  const { user, completeNewInstitutionOnboarding } = useAuth();
+  const { user, verificationAccess } = useAuth();
+  const [selected, setSelected] = useState<RegistryMatch | null | undefined>(undefined);
+  const [query, setQuery] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [institutionName, setInstitutionName] = useState("");
-  const [institutionCode, setInstitutionCode] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [awaitingVerification, setAwaitingVerification] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const completionStarted = useRef(false);
-
-  const finishOnboarding = useCallback(async () => {
-    setIsCompleting(true);
-    setError(null);
-    try {
-      if (!supabase) throw new Error("Supabase is unavailable.");
-      const {
-        data: { user: verified },
-      } = await supabase.auth.getUser();
-      if (
-        !verified?.user_metadata?.["terms_accepted"] ||
-        !verified.user_metadata?.["privacy_acknowledged"]
-      )
-        throw new Error("Accept both current policies before institution setup.");
-      await acceptPolicies("signup");
-      await completeNewInstitutionOnboarding();
-      await router.navigate({ to: "/", replace: true });
-    } catch (completionError) {
-      setError(
-        completionError instanceof Error
-          ? completionError.message
-          : "We could not complete institution setup. Please try again.",
-      );
-    } finally {
-      setIsCompleting(false);
-    }
-  }, [completeNewInstitutionOnboarding, router]);
-
+  const [confirm, setConfirm] = useState("");
+  const [terms, setTerms] = useState(false);
+  const [privacy, setPrivacy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
   useEffect(() => {
-    if (user || completionStarted.current || !hasDatabaseConnection() || !supabase) return;
-
-    const authClient = supabase;
     let active = true;
-
-    const tryComplete = async () => {
-      const {
-        data: { user: verifiedUser },
-      } = await authClient.auth.getUser();
-      if (!active || !verifiedUser?.email_confirmed_at) return;
-      if (completionStarted.current) return;
-      completionStarted.current = true;
-      setAwaitingVerification(true);
-      await finishOnboarding();
-    };
-
-    // Attempt immediately (covers the case where the session is already
-    // established, e.g. the user refreshes the page after verification).
-    void tryComplete();
-
-    // Also listen for auth state changes — the Supabase client's
-    // detectSessionInUrl processing fires SIGNED_IN asynchronously after the
-    // URL code/token has been exchanged. Without this listener the useEffect
-    // above fires before the session is ready and silently does nothing.
-    const { data: sub } = authClient.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
-        void tryComplete();
-      }
+    void supabase.auth.getUser().then(({ data }) => {
+      if (active && data.user?.email_confirmed_at && !user)
+        void router.navigate({ to: "/institution-verification", replace: true });
     });
-
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
     };
-  }, [finishOnboarding, user]);
-
-  const submit = async (event: React.FormEvent) => {
+  }, [router, user]);
+  async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setError(null);
-
-    const normalizedName = name.trim();
-    const normalizedEmail = normalizeAuthEmail(email);
-    const normalizedInstitutionName = institutionName.trim();
-    const normalizedInstitutionCode = normalizeInstitutionCode(institutionCode);
-
-    if (normalizedName.length < 2 || normalizedName.length > 120) {
-      setError("Enter your full name (2–120 characters).");
+    setError("");
+    if (password.length < 12 || password !== confirm) {
+      setError("Use at least 12 characters and enter the same password twice.");
       return;
     }
-    if (!emailPattern.test(normalizedEmail)) {
-      setError("Enter a valid work email address.");
+    if (!terms || !privacy || selected === undefined) {
+      setError("Choose an institution or manual review and accept the policies.");
       return;
     }
-    if (normalizedInstitutionName.length < 2 || normalizedInstitutionName.length > 120) {
-      setError("Enter an institution name (2–120 characters).");
-      return;
-    }
-    if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(normalizedInstitutionCode)) {
-      setError(
-        "Use a 2–63 character institution code with lowercase letters, numbers, and hyphens.",
-      );
-      return;
-    }
-    if (password.length < 12) {
-      setError("Use a password of at least 12 characters.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("The passwords do not match.");
-      return;
-    }
-    if (!termsAccepted || !privacyAcknowledged) {
-      setError(
-        "Accept the Terms & Conditions and acknowledge the Privacy Policy to create an account.",
-      );
-      return;
-    }
-    if (!hasDatabaseConnection() || !supabase) {
-      setError("Institution account creation needs a connected Supabase environment.");
-      return;
-    }
-
-    setIsSubmitting(true);
+    setBusy(true);
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: normalizedEmail,
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email: normalizeAuthEmail(email),
         password,
         options: {
-          emailRedirectTo: new URL("/create-account", window.location.origin).toString(),
+          emailRedirectTo: new URL("/institution-verification", window.location.origin).href,
           data: {
-            name: normalizedName,
-            onboarding_intent: "new_institution_admin",
-            onboarding_institution_name: normalizedInstitutionName,
-            onboarding_institution_code: normalizedInstitutionCode,
+            name: name.trim(),
+            onboarding_intent: "institution_verification",
+            registry_id_hint: selected?.id ?? null,
+            institution_name_hint: selected?.canonical_name ?? query.trim(),
             terms_accepted: true,
             privacy_acknowledged: true,
           },
         },
       });
       setPassword("");
-      setConfirmPassword("");
-
-      // Supabase intentionally returns an empty identities list for an
-      // already-registered email. Keep the response non-enumerating.
-      if (signUpError) {
-        setError(signUpErrorMessage(signUpError));
+      setConfirm("");
+      if (signupError) {
+        setError(signUpErrorMessage(signupError));
         return;
       }
-      if (!data.user) {
-        setError(
-          "We could not verify that your authentication account was created. Please try again.",
-        );
+      if (!data.user || data.user.identities?.length === 0) {
+        setSent(true);
         return;
       }
-      if (data.user.identities?.length === 0) {
-        setError(
-          "An account may already exist for this email. Try signing in or resetting your password.",
-        );
-        return;
-      }
-
-      setAwaitingVerification(true);
-      if (data.session && data.user.email_confirmed_at) {
-        completionStarted.current = true;
-        await finishOnboarding();
-      }
+      if (data.session && data.user.email_confirmed_at)
+        await router.navigate({ to: "/institution-verification" });
+      else setSent(true);
     } catch {
-      setPassword("");
-      setConfirmPassword("");
-      setError("We could not create your institution account. Please try again.");
+      setError("Account identity could not be created. Please try again.");
     } finally {
-      setIsSubmitting(false);
+      setBusy(false);
     }
-  };
-
-  if (user) {
-    return (
-      <AccountCard
-        title="You already have staff access"
-        description="Use your existing administrator account to invite faculty and staff."
-      >
-        <Button asChild className="w-full">
-          <Link to="/">Go to dashboard</Link>
-        </Button>
-      </AccountCard>
-    );
   }
-
-  if (awaitingVerification) {
-    const hasProvisioningError = !!error && !isCompleting;
-
-    return (
-      <AccountCard
-        title={
-          isCompleting
-            ? "Creating your institution…"
-            : hasProvisioningError
-              ? "Institution setup incomplete"
-              : "Check your email"
-        }
-        description={
-          isCompleting
-            ? "We are securely creating your institution and administrator membership."
-            : hasProvisioningError
-              ? "Your email is verified, but we could not finish setting up your institution."
-              : "Verify your work email using the link we sent. Institution setup will complete after verification."
-        }
-      >
-        {error && <ErrorMessage message={error} />}
-        {hasProvisioningError && (
-          <Button
-            className="w-full"
-            onClick={() => {
-              completionStarted.current = false;
-              void finishOnboarding();
-            }}
-          >
-            Retry institution setup
-          </Button>
-        )}
-        {!isCompleting && !hasProvisioningError && (
-          <p className="text-center text-sm text-muted-foreground">
-            Already verified? Reopen the verification link, or return to the login page.
-          </p>
-        )}
-        <Button asChild className="w-full" variant="outline">
-          <Link to="/login" search={{ redirect: undefined }}>
-            Back to sign in
-          </Link>
-        </Button>
-      </AccountCard>
-    );
-  }
-
   return (
-    <AccountCard
-      title="Create your AttendAI institution account"
-      description="This creates one new institution and its first administrator. Faculty and staff are invited later."
-    >
-      <form className="space-y-4" onSubmit={submit}>
-        {error && <ErrorMessage message={error} />}
-        <fieldset className="space-y-4" disabled={isSubmitting}>
-          <div className="space-y-2">
-            <Label htmlFor="full-name">Full name</Label>
-            <Input
-              id="full-name"
-              autoComplete="name"
-              maxLength={120}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="work-email">Work email</Label>
-            <Input
-              id="work-email"
-              type="email"
-              autoComplete="email"
-              autoCapitalize="none"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2 border-t pt-4">
-            <Label htmlFor="institution-name">Institution name</Label>
-            <Input
-              id="institution-name"
-              autoComplete="organization"
-              maxLength={120}
-              value={institutionName}
-              onChange={(event) => setInstitutionName(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="institution-code">Institution code</Label>
-            <Input
-              id="institution-code"
-              autoComplete="off"
-              maxLength={63}
-              placeholder="northstar-college"
-              value={institutionCode}
-              onChange={(event) => setInstitutionCode(event.target.value)}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Lowercase letters, numbers, and hyphens only.
-            </p>
-          </div>
-          <div className="space-y-2 border-t pt-4">
-            <Label htmlFor="new-password">Password</Label>
-            <Input
-              id="new-password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirm password</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-3 border-t pt-4 text-sm">
-            <label className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={termsAccepted}
-                onChange={(event) => setTermsAccepted(event.target.checked)}
-                required
-              />
-              <span>
-                I have read and agree to the{" "}
-                <Link to="/terms" target="_blank" className="text-primary underline">
-                  Terms & Conditions
-                </Link>
-                .
-              </span>
-            </label>
-            <label className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={privacyAcknowledged}
-                onChange={(event) => setPrivacyAcknowledged(event.target.checked)}
-                required
-              />
-              <span>
-                I acknowledge the{" "}
-                <Link to="/privacy" target="_blank" className="text-primary underline">
-                  Privacy Policy
-                </Link>
-                .
-              </span>
-            </label>
-          </div>
-        </fieldset>
-        <Button className="w-full" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Creating account…" : "Create institution account"}
-        </Button>
-      </form>
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
-        <Link
-          to="/login"
-          search={{ redirect: undefined }}
-          className="font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Sign in
-        </Link>
-      </p>
-    </AccountCard>
-  );
-}
-
-function AccountCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-muted/20 p-4">
-      <Card className="w-full max-w-md border-primary/20 shadow-lg">
-        <CardHeader className="pb-6 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <Building2 className="h-6 w-6" />
-          </div>
-          <CardTitle className="text-2xl font-display">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
+    <main className="mx-auto flex min-h-screen max-w-2xl items-center p-4">
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Register your institution</CardTitle>
+          <CardDescription>
+            Institution existence and your authority to represent it are verified separately.
+            Submitting an application does not grant institution access.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">{children}</CardContent>
+        <CardContent className="space-y-5">
+          {user ? (
+            <>
+              <p>
+                You already have staff access. Use the authorized administrator recovery process for
+                an existing institution.
+              </p>
+              <Button asChild>
+                <Link to="/">Go to dashboard</Link>
+              </Button>
+            </>
+          ) : verificationAccess ? (
+            <Button asChild>
+              <Link to="/institution-verification">Continue verification</Link>
+            </Button>
+          ) : sent ? (
+            <div role="status" className="space-y-3">
+              <h2 className="font-semibold">Check your email</h2>
+              <p>
+                Verify your account identity using the email link. If an account already exists,
+                sign in or reset its password. Your institution will remain pending until
+                independently approved.
+              </p>
+              <Button asChild variant="outline">
+                <Link to="/login" search={{ redirect: undefined }}>
+                  Sign in
+                </Link>
+              </Button>
+            </div>
+          ) : selected === undefined ? (
+            <>
+              <h2 className="font-semibold">Step 1 — Find institution</h2>
+              <InstitutionSearch
+                onSelect={(match, text) => {
+                  setSelected(match);
+                  setQuery(text);
+                }}
+              />
+            </>
+          ) : (
+            <form onSubmit={submit} className="space-y-4">
+              <div className="rounded-lg border p-3">
+                <strong>
+                  {selected?.canonical_name ?? (query || "Manual institution review")}
+                </strong>
+                <p className="text-sm">
+                  {selected
+                    ? selected.state + " · " + selected.institution_type
+                    : "Institution not listed: manual review is available."}
+                </p>
+                <Button type="button" variant="link" onClick={() => setSelected(undefined)}>
+                  Change institution selection
+                </Button>
+              </div>
+              <h2 className="font-semibold">Verify your account identity to continue</h2>
+              <p className="text-sm text-muted-foreground">
+                Email verification creates an applicant identity. It does not make you an
+                institution administrator.
+              </p>
+              <fieldset disabled={busy} className="space-y-4">
+                <div>
+                  <Label htmlFor="full-name">Your full name</Label>
+                  <Input
+                    id="full-name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={120}
+                    required
+                    autoComplete="name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="work-email">Your email</Label>
+                  <Input
+                    id="work-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="new-password">Password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={12}
+                    required
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="confirm-password">Confirm password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirm}
+                    onChange={(e) => setConfirm(e.target.value)}
+                    required
+                    autoComplete="new-password"
+                  />
+                </div>
+                <label className="flex gap-2">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={terms}
+                    onChange={(e) => setTerms(e.target.checked)}
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <Link to="/terms" target="_blank" className="underline">
+                      Terms & Conditions
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <label className="flex gap-2">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={privacy}
+                    onChange={(e) => setPrivacy(e.target.checked)}
+                  />
+                  <span>
+                    I acknowledge the{" "}
+                    <Link to="/privacy" target="_blank" className="underline">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                </label>
+              </fieldset>
+              {error && (
+                <p role="alert" className="text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" disabled={busy}>
+                {busy ? "Creating account identity…" : "Create applicant account"}
+              </Button>
+            </form>
+          )}
+          <p className="text-sm">
+            Already registered?{" "}
+            <Link to="/login" search={{ redirect: undefined }} className="underline">
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
       </Card>
-    </div>
+    </main>
   );
-}
-
-function ErrorMessage({ message }: { message: string }) {
-  return <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">{message}</div>;
 }

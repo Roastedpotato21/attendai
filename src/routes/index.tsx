@@ -15,15 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  CalendarCheck,
-  PhoneCall,
-  MessageSquare,
-  TriangleAlert,
-  ArrowUpRight,
-  Sparkles,
-} from "lucide-react";
-import { toast } from "sonner";
+import { CalendarCheck, PhoneCall, MessageSquare, TriangleAlert, ArrowUpRight } from "lucide-react";
 
 import { PageHeader, StatCard, StatusPill, toneForStatus } from "@/components/common/page-parts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,7 +37,6 @@ import {
   attendanceService,
   voiceCallService,
   insightsService,
-  communication,
 } from "@/lib/services";
 
 export const Route = createFileRoute("/")({
@@ -76,6 +67,7 @@ const pieColors = [
 ];
 
 function Dashboard() {
+  const [loadError, setLoadError] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [absentToday, setAbsentToday] = useState<Student[]>([]);
   const [kpis, setKpis] = useState<KPIs | null>(null);
@@ -95,59 +87,42 @@ function Dashboard() {
       attendanceService.getLanguageSplit(),
       voiceCallService.getAll(),
       insightsService.getAll(),
-    ]).then(
-      ([
-        studentsData,
-        absentData,
-        kpisData,
-        trendData,
-        classAttData,
-        langSplitData,
-        callsData,
-        insightsData,
-      ]) => {
-        setStudents(studentsData);
-        setAbsentToday(absentData);
-        setKpis(kpisData);
-        setAttendanceTrend(trendData);
-        setClassAttendance(classAttData);
-        setLanguageSplit(langSplitData);
-        setCalls(callsData);
-        setAiInsights(insightsData);
-      },
-    );
+    ])
+      .then(
+        ([
+          studentsData,
+          absentData,
+          kpisData,
+          trendData,
+          classAttData,
+          langSplitData,
+          callsData,
+          insightsData,
+        ]) => {
+          setStudents(studentsData);
+          setAbsentToday(absentData);
+          setKpis(kpisData);
+          setAttendanceTrend(trendData);
+          setClassAttendance(classAttData);
+          setLanguageSplit(langSplitData);
+          setCalls(callsData);
+          setAiInsights(insightsData);
+        },
+      )
+      .catch(() => setLoadError(true));
   }, []);
 
-  const attention = [...students].sort((a, b) => a.attendanceRate - b.attendanceRate).slice(0, 6);
+  const attention = students
+    .filter((student) => student.attendanceRate !== null && student.attendanceRate < 75)
+    .sort((a, b) => (a.attendanceRate ?? 0) - (b.attendanceRate ?? 0))
+    .slice(0, 6);
 
-  const runWorkflow = async () => {
-    toast.loading("Running absence workflow…", { id: "wf" });
-    try {
-      await communication.messaging.send({
-        to: "+91 90000 00000",
-        channel: "WhatsApp",
-        language: "Telugu",
-        templateId: "T-02",
-        variables: {},
-      });
-      await communication.voice.call({
-        to: "+91 90000 00000",
-        language: "Telugu",
-        scriptTemplateId: "T-06",
-        variables: {},
-      });
-      toast.success(
-        `${absentToday.length} absentees processed — messages queued, AI calls scheduled`,
-        {
-          id: "wf",
-          description: "Simulation mode: no real messages or calls were sent.",
-        },
-      );
-    } catch (error) {
-      console.error("Absence workflow failed:", error);
-      toast.error("Workflow failed — please try again", { id: "wf" });
-    }
-  };
+  if (loadError)
+    return (
+      <p role="alert" className="p-8">
+        Unable to load institution records. Please reload to try again.
+      </p>
+    );
 
   if (!kpis) {
     return <div className="p-8 text-center text-muted-foreground">Loading dashboard...</div>;
@@ -156,16 +131,12 @@ function Dashboard() {
   return (
     <div className="mx-auto max-w-[1400px]">
       <PageHeader
-        title="Good morning, Dr. Meera"
+        title="Attendance dashboard"
         description="Here's what AttendAI handled across your campus today."
         actions={
           <>
             <Button variant="outline" asChild>
               <Link to="/reports">View reports</Link>
-            </Button>
-            <Button onClick={runWorkflow}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Run absence workflow
             </Button>
           </>
         }
@@ -174,30 +145,26 @@ function Dashboard() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Attendance today"
-          value={`${kpis.attendanceToday}%`}
-          delta="+1.8% vs last week"
+          value={kpis.attendanceToday === null ? "No records" : `${kpis.attendanceToday}%`}
           icon={<CalendarCheck className="h-5 w-5" />}
           hint={`${absentToday.length} students unaccounted`}
         />
         <StatCard
           label="AI voice calls"
           value={String(kpis.callsToday)}
-          delta={`${kpis.callSuccess}% answered`}
+          delta={kpis.callSuccess === null ? "No calls recorded" : `${kpis.callSuccess}% completed`}
           icon={<PhoneCall className="h-5 w-5" />}
-          hint="Telugu, Hindi, English"
         />
         <StatCard
           label="Messages sent"
           value={String(kpis.messagesSent)}
-          delta="SMS + WhatsApp"
           trend="flat"
           icon={<MessageSquare className="h-5 w-5" />}
-          hint={`Avg parent reply ${kpis.avgResponseMin} min`}
+          hint="Provider-accepted or delivered messages today"
         />
         <StatCard
           label="Open escalations"
           value={String(kpis.openEscalations)}
-          delta="2 need principal review"
           trend="down"
           icon={<TriangleAlert className="h-5 w-5" />}
           hint="L1 → L4 workflow"
@@ -208,7 +175,9 @@ function Dashboard() {
         <Card className="card-elevated lg:col-span-2">
           <CardHeader>
             <CardTitle>Attendance & AI call trend</CardTitle>
-            <CardDescription>Present rate vs AI outreach volume, last 7 days</CardDescription>
+            <CardDescription>
+              Daily attendance percentage and recorded call count, last 7 days
+            </CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -338,7 +307,7 @@ function Dashboard() {
         <Card className="card-elevated">
           <CardHeader>
             <CardTitle>Class-wise attendance</CardTitle>
-            <CardDescription>Today's present rate</CardDescription>
+            <CardDescription>Across recorded attendance sessions</CardDescription>
           </CardHeader>
           <CardContent className="h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -413,7 +382,7 @@ function Dashboard() {
                     {s.attendanceRate}%
                   </span>
                 </div>
-                <Progress value={s.attendanceRate} className="mt-2 h-1.5" />
+                <Progress value={s.attendanceRate ?? 0} className="mt-2 h-1.5" />
               </div>
             ))}
           </CardContent>
@@ -422,7 +391,7 @@ function Dashboard() {
         <Card className="card-elevated">
           <CardHeader>
             <CardTitle>AI insights</CardTitle>
-            <CardDescription>Generated from the last 30 days</CardDescription>
+            <CardDescription>Published insights</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {aiInsights.slice(0, 3).map((i) => (

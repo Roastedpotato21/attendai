@@ -62,8 +62,8 @@ function AcceptInvitePage() {
     setIsSubmitting(true);
     try {
       await acceptPolicies("signup");
-      await completeInvitation(password);
-      await router.navigate({ to: "/", replace: true });
+      const staff = await completeInvitation(password);
+      await router.navigate({ to: staff ? "/" : "/institution-verification", replace: true });
     } catch (acceptError) {
       setError(acceptError instanceof Error ? acceptError.message : "Unable to accept invitation.");
     } finally {

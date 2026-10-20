@@ -186,14 +186,35 @@ test("SMS defaults off, requires a live allowlist, and selects English only as f
 
 test("legacy SMS adapter cannot select paid delivery from credentials", async () => {
   const before = calls.length;
-  const result = await getTwilioProvider().send({
-    to: "+919876543210",
-    body: "test only",
-    studentName: "Student",
-    parentName: "Parent",
-  });
-  assert.equal(result.provider, "twilio(mock)");
+  await assert.rejects(
+    getTwilioProvider().send({
+      to: "+919876543210",
+      body: "test only",
+      studentName: "Student",
+      parentName: "Parent",
+    }),
+    /Legacy SMS delivery is disabled/,
+  );
   assert.equal(calls.length, before);
+});
+
+test("production cannot create simulated SMS delivery evidence", async () => {
+  const originalMode = process.env.SMS_DELIVERY_MODE;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const before = calls.length;
+  try {
+    process.env.SMS_DELIVERY_MODE = "simulate";
+    process.env.NODE_ENV = "production";
+    const result = await deliver(job, communication, parent, templateFor("en"), "Northstar");
+    assert.equal(result.ok, false);
+    assert.equal(result.message, "SMS simulation is disabled in production");
+    assert.equal(calls.length, before);
+  } finally {
+    if (originalMode === undefined) delete process.env.SMS_DELIVERY_MODE;
+    else process.env.SMS_DELIVERY_MODE = originalMode;
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = originalNodeEnv;
+  }
 });
 
 test("SMS template rendering rejects unapproved or missing variables", () => {

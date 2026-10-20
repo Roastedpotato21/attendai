@@ -5,7 +5,6 @@ import type {
   ClassAIInsight,
   StudentAIInsight,
 } from "@/lib/types";
-import { mockAiAnalysisService } from "@/lib/services/ai";
 
 /**
  * Executes a prompt against configured LLMs securely on the server.
@@ -93,12 +92,8 @@ Ensure the output is ONLY a valid JSON object with the "insights" key.
       }
       throw new Error("Invalid shape returned by AI");
     } catch (e) {
-      console.warn(
-        "[AI Provider] Failed to fetch real AI insights, falling back to heuristics.",
-        e,
-      );
-      // Fallback to heuristic mock service
-      return mockAiAnalysisService.generateClassInsights(data);
+      console.error("AI insights unavailable", e);
+      throw new Error("AI insights are currently unavailable.");
     }
   });
 
@@ -138,10 +133,7 @@ Ensure the output is ONLY a valid JSON object matching the schema.
       }
       throw new Error("Invalid shape returned by AI");
     } catch (e) {
-      console.warn(
-        "[AI Provider] Failed to fetch real student AI insights, falling back to heuristics.",
-        e,
-      );
-      return mockAiAnalysisService.generateStudentInsights(profile);
+      console.error("AI insights unavailable", e);
+      throw new Error("AI insights are currently unavailable.");
     }
   });

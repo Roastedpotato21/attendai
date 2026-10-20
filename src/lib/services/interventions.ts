@@ -14,11 +14,8 @@ export interface InterventionService {
   runInterventionEngine(): Promise<{ created: number; notified: number }>;
 }
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-export const mockInterventionService: InterventionService = {
+export const interventionService: InterventionService = {
   async getInterventions(filters = {}) {
-    await delay(300);
     const dbInterventions = await interventionRepository.findAll();
     const students = await studentRepository.findAll();
 
@@ -57,7 +54,6 @@ export const mockInterventionService: InterventionService = {
   },
 
   async updateStatus(id: string, status: InterventionStatus) {
-    await delay(200);
     const updates: { status: InterventionStatus; actionTaken?: string; actionDate?: string } = {
       status,
     };
@@ -69,7 +65,6 @@ export const mockInterventionService: InterventionService = {
   },
 
   async runInterventionEngine() {
-    await delay(500);
     const analytics = await analyticsService.getDashboardData();
     const existingInterventions = await interventionRepository.findAll();
 
@@ -114,5 +109,3 @@ export const mockInterventionService: InterventionService = {
     return { created: createdCount, notified: notifiedCount };
   },
 };
-
-export const interventionService: InterventionService = mockInterventionService;

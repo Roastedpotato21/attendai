@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { AuthUser, UserRole } from "@/lib/types";
 import { useRouter } from "@tanstack/react-router";
-import { getDataMode, hasDatabaseConnection, supabase } from "@/lib/db/connection";
+import { hasDatabaseConnection, supabase } from "@/lib/db/connection";
 import { userRepository, type StaffAccessResolution } from "@/lib/db/repositories";
 import {
   authErrorDiagnostic,
@@ -13,24 +13,16 @@ import {
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
-  /** Mock login by user ID (in-memory DB only) */
-  login: (userId: string) => Promise<void>;
-  /** Password login (Supabase or mock fallback) — returns the AuthUser for post-login routing */
-  loginWithPassword: (email: string, password: string) => Promise<AuthUser>;
-  completeNewInstitutionOnboarding: () => Promise<AuthUser>;
+  verificationAccess: boolean;
+  /** Password login — returns the AuthUser for post-login routing */
+  loginWithPassword: (email: string, password: string) => Promise<AuthUser | null>;
   /** Complete a Supabase invitation and verify its institution membership and role. */
-  completeInvitation: (password: string) => Promise<AuthUser>;
+  completeInvitation: (password: string) => Promise<AuthUser | null>;
   sendPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
-const PORTAL_ROLES: readonly UserRole[] = ["admin", "faculty", "staff"];
-
-function isPortalRole(role: UserRole): boolean {
-  return PORTAL_ROLES.includes(role);
-}
-
 class StaffPortalAccessError extends Error {
   constructor(readonly reason: Exclude<StaffAccessResolution["status"], "allowed">) {
     super(staffAccessErrorMessage(reason));
@@ -45,22 +37,12 @@ function isNetworkFailure(error: unknown): boolean {
 }
 
 function isUnprovisionedAuthRoute(): boolean {
-  return (
-    window.location.pathname === "/accept-invite" || window.location.pathname === "/create-account"
-  );
-}
-
-function onboardingError(error: { code?: string } | null): Error {
-  if (error?.code === "23505") {
-    return new Error("That institution code is unavailable. Choose another code.");
-  }
-  if (error?.code === "42501") {
-    return new Error("This account cannot create an AttendAI institution.");
-  }
-  if (error?.code === "22023") {
-    return new Error("Your institution details are invalid. Review them and try again.");
-  }
-  return new Error("We could not complete institution setup. Please try again.");
+  return [
+    "/accept-invite",
+    "/create-account",
+    "/institution-verification",
+    "/institution-review",
+  ].includes(window.location.pathname);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,44 +73,19 @@ function staffAccessUser(resolution: StaffAccessResolution): AuthUser {
 }
 
 // ---------------------------------------------------------------------------
-// Mock-mode helpers (localStorage session, no Supabase)
-// ---------------------------------------------------------------------------
-
-const MOCK_SESSION_KEY = "mock_auth_session";
-
-function saveMockSession(user: AuthUser) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(MOCK_SESSION_KEY, JSON.stringify(user));
-  }
-}
-
-function clearMockSession() {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(MOCK_SESSION_KEY);
-  }
-}
-
-function loadMockSession(): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = localStorage.getItem(MOCK_SESSION_KEY);
-    const storedUser = stored ? (JSON.parse(stored) as AuthUser) : null;
-    if (storedUser && !isPortalRole(storedUser.role)) {
-      clearMockSession();
-      return null;
-    }
-    return storedUser;
-  } catch {
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [verificationAccess, setVerificationAccess] = useState(false);
+
+  const allowVerificationSession = async () => {
+    const { data, error } = await supabase.rpc("my_institution_verification_access");
+    const allowed = !error && data?.allowed === true;
+    if (mountedRef.current) setVerificationAccess(allowed);
+    return allowed;
+  };
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
@@ -162,13 +119,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // PGRST/network errors throw; an expired/missing JWT returns error with
             // status 401 — treat that as "not authenticated" rather than a crash.
             console.warn("Auth validation failed:", getUserError.message);
-            if (mountedRef.current) setUser(null);
+            if (mountedRef.current) {
+              setUser(null);
+              setVerificationAccess(false);
+            }
           } else if (authUser) {
             const resolution = await userRepository.resolveStaffAccess(authUser.id);
             if (mountedRef.current) {
               if (resolution.status === "allowed") {
                 setUser(staffAccessUser(resolution));
-              } else if (isUnprovisionedAuthRoute()) {
+                setVerificationAccess(false);
+              } else if ((await allowVerificationSession()) || isUnprovisionedAuthRoute()) {
                 // Invite, recovery, and first-admin verification tokens are not
                 // staff sessions until their trusted RPC validates the role.
                 setUser(null);
@@ -179,43 +140,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             }
           } else {
-            if (mountedRef.current) setUser(null);
+            if (mountedRef.current) {
+              setUser(null);
+              setVerificationAccess(false);
+            }
           }
 
           // Subscribe to auth state changes (tab focus, token refresh, sign-out in other tabs)
-          const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (session?.user) {
-              try {
-                const resolution = await userRepository.resolveStaffAccess(session.user.id);
-                // V6 FIX: Guard against setState after unmount
-                if (mountedRef.current) {
-                  if (resolution.status === "allowed") {
-                    setUser(staffAccessUser(resolution));
-                  } else if (isUnprovisionedAuthRoute()) {
+          const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+            window.setTimeout(() => {
+              void (async () => {
+                if (session?.user) {
+                  try {
+                    const resolution = await userRepository.resolveStaffAccess(session.user.id);
+                    // V6 FIX: Guard against setState after unmount
+                    if (mountedRef.current) {
+                      if (resolution.status === "allowed") {
+                        setUser(staffAccessUser(resolution));
+                        setVerificationAccess(false);
+                      } else if ((await allowVerificationSession()) || isUnprovisionedAuthRoute()) {
+                        setUser(null);
+                      } else {
+                        console.warn("Staff portal session denied:", resolution.status);
+                        if (supabase) await supabase.auth.signOut();
+                        setUser(null);
+                      }
+                    }
+                  } catch (e) {
+                    console.error("Profile lookup failed in onAuthStateChange", e);
+                    if (mountedRef.current) {
+                      setUser(null);
+                      setVerificationAccess(false);
+                    }
+                  }
+                } else {
+                  if (mountedRef.current) {
                     setUser(null);
-                  } else {
-                    console.warn("Staff portal session denied:", resolution.status);
-                    if (supabase) await supabase.auth.signOut();
-                    setUser(null);
+                    setVerificationAccess(false);
                   }
                 }
-              } catch (e) {
-                console.error("Profile lookup failed in onAuthStateChange", e);
-              }
-            } else {
-              if (mountedRef.current) setUser(null);
-            }
-            router.invalidate();
+                router.invalidate();
+              })().catch(() => {
+                if (mountedRef.current) {
+                  setUser(null);
+                  setVerificationAccess(false);
+                }
+              });
+            }, 0);
           });
           subscription = data.subscription;
-        } else {
-          // Mock auth flow — restore from localStorage
-          const currentUser = loadMockSession();
-          if (mountedRef.current) setUser(currentUser);
         }
       } catch (e) {
         console.error("Auth init error", e);
-        if (mountedRef.current) setUser(null);
+        if (mountedRef.current) {
+          setUser(null);
+          setVerificationAccess(false);
+        }
       } finally {
         if (mountedRef.current) setIsLoading(false);
       }
@@ -231,31 +211,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   // -------------------------------------------------------------------------
-  // Login: mock user ID (for in-memory DB demos)
-  // -------------------------------------------------------------------------
-  const login = async (userId: string) => {
-    if (getDataMode() !== "mock") {
-      throw new Error("Mock login is available only when VITE_DATA_MODE=mock.");
-    }
-    const dbUser = await userRepository.findById(userId);
-    if (!dbUser) throw new Error("Invalid user ID");
-    if (!isPortalRole(dbUser.role)) {
-      throw new Error("This portal is available only to administrators, faculty, and staff.");
-    }
-
-    const u = toAuthUser(dbUser);
-    setUser(u);
-    saveMockSession(u);
-    router.update({ context: { ...router.options.context, auth: { user: u } } });
-    router.invalidate();
-  };
-
-  // -------------------------------------------------------------------------
-  // Login: email + password (Supabase or mock fallback)
+  // Login: email + password
   // V5 FIX: This is now the single source of truth — no module-level currentUser.
   // Returns the AuthUser so the caller can do post-login routing.
   // -------------------------------------------------------------------------
-  const loginWithPassword = async (email: string, password: string): Promise<AuthUser> => {
+  const loginWithPassword = async (email: string, password: string): Promise<AuthUser | null> => {
     if (hasDatabaseConnection() && supabase) {
       // Real Supabase login
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -272,7 +232,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const u = staffAccessUser(await userRepository.resolveStaffAccess(authData.user.id));
+        const resolution = await userRepository.resolveStaffAccess(authData.user.id);
+        if (resolution.status !== "allowed" && (await allowVerificationSession())) {
+          setUser(null);
+          return null;
+        }
+        const u = staffAccessUser(resolution);
+        setVerificationAccess(false);
         setUser(u);
         router.update({ context: { ...router.options.context, auth: { user: u } } });
         router.invalidate();
@@ -285,70 +251,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         throw new Error("Unable to verify staff portal access. Please try again.");
       }
-    } else if (getDataMode() === "mock") {
-      // Mock fallback — find user by email in the in-memory DB
-      const dbUser = await userRepository.findByEmail(email);
-      if (!dbUser) {
-        throw new Error("Invalid email or password.");
-      }
-      if (!isPortalRole(dbUser.role)) {
-        throw new Error("This portal is available only to administrators, faculty, and staff.");
-      }
-
-      const u = toAuthUser(dbUser);
-      setUser(u);
-      saveMockSession(u);
-      router.update({ context: { ...router.options.context, auth: { user: u } } });
-      router.invalidate();
-      return u;
     }
 
     throw new Error("AttendAI authentication is not configured.");
   };
 
   // -------------------------------------------------------------------------
-  // New institution onboarding
-  // -------------------------------------------------------------------------
-  const completeNewInstitutionOnboarding = async (): Promise<AuthUser> => {
-    if (!hasDatabaseConnection() || !supabase) {
-      throw new Error("Institution account creation is available only with Supabase.");
-    }
-    const {
-      data: { user: onboardingUser },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !onboardingUser) {
-      throw new Error("Verify your email using the link we sent, then try again.");
-    }
-    if (!onboardingUser.email_confirmed_at) {
-      throw new Error("Verify your email before creating your institution.");
-    }
-
-    const { error: provisioningError } = await supabase.rpc("provision_my_new_institution");
-    if (provisioningError) throw onboardingError(provisioningError);
-
-    try {
-      const u = staffAccessUser(await userRepository.resolveStaffAccess(onboardingUser.id));
-      if (u.role !== "admin") {
-        throw new Error("Your institution administrator access could not be verified.");
-      }
-      setUser(u);
-      router.update({ context: { ...router.options.context, auth: { user: u } } });
-      router.invalidate();
-      return u;
-    } catch (error) {
-      // Do NOT sign out here — the user's email is verified and their auth
-      // session is valid. Signing out would force them to log in again just to
-      // retry provisioning. Re-throw so the create-account retry UI can handle it.
-      if (error instanceof Error) throw error;
-      throw new Error("Your institution administrator access could not be verified.");
-    }
-  };
-
-  // -------------------------------------------------------------------------
   // Invitation and password-recovery completion
   // -------------------------------------------------------------------------
-  const completeInvitation = async (password: string): Promise<AuthUser> => {
+  const completeInvitation = async (password: string): Promise<AuthUser | null> => {
     if (!hasDatabaseConnection() || !supabase) {
       throw new Error("Invitation acceptance is available only with Supabase.");
     }
@@ -370,7 +281,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // pending invitation; in that case access resolution below still proves
       // the account is authorized. A pending invite must activate successfully.
       const { error: activationError } = await supabase.rpc("activate_my_staff_invitation");
-      const u = staffAccessUser(await userRepository.resolveStaffAccess(data.user.id));
+      const resolution = await userRepository.resolveStaffAccess(data.user.id);
+      if (resolution.status !== "allowed" && (await allowVerificationSession())) {
+        setUser(null);
+        return null;
+      }
+      const u = staffAccessUser(resolution);
       if (activationError && u.role !== "admin" && u.role !== "faculty" && u.role !== "staff") {
         throw activationError;
       }
@@ -387,8 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendPasswordReset = async (email: string): Promise<void> => {
     if (!hasDatabaseConnection() || !supabase) {
-      // Mock mode deliberately does not pretend to send real recovery email.
-      return;
+      throw new Error("AttendAI authentication is not configured.");
     }
     const { error } = await supabase.auth.resetPasswordForEmail(normalizeAuthEmail(email), {
       redirectTo: new URL("/accept-invite", window.location.origin).toString(),
@@ -404,7 +319,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw new Error(error.message);
     }
-    clearMockSession();
+    setVerificationAccess(false);
     setUser(null);
     router.update({ context: { ...router.options.context, auth: { user: null } } });
     router.invalidate();
@@ -420,9 +335,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
-        login,
+        verificationAccess,
         loginWithPassword,
-        completeNewInstitutionOnboarding,
         completeInvitation,
         sendPasswordReset,
         logout,

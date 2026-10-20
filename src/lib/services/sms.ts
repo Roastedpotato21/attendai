@@ -34,27 +34,6 @@ export interface SmsProvider {
   send(input: SmsInput): Promise<SmsResult>;
 }
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const generateMessageId = (prefix: string) =>
-  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-
-/**
- * Mock SMS Provider for development/testing
- */
-export const mockSmsProvider: SmsProvider = {
-  async send(input) {
-    await delay(300);
-    return {
-      ok: true,
-      messageId: generateMessageId("SMS"),
-      provider: "msg91(mock)",
-      timestamp: new Date().toISOString(),
-      status: "sent",
-      note: "Mocked SMS sent - no real message delivered.",
-    };
-  },
-};
-
 /**
  * Twilio SMS Adapter for the generic SmsProvider interface
  */

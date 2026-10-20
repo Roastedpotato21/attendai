@@ -193,7 +193,12 @@ function StudentsPage() {
               <DetailRow label="Phone" value={selected.parentPhone} />
               <DetailRow label="Preferred language" value={selected.language} />
               <Separator />
-              <DetailRow label="Attendance rate" value={`${selected.attendanceRate}%`} />
+              <DetailRow
+                label="Attendance rate"
+                value={
+                  selected.attendanceRate === null ? "No records" : `${selected.attendanceRate}%`
+                }
+              />
               <DetailRow
                 label="Consecutive absences"
                 value={String(selected.consecutiveAbsences)}

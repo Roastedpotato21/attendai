@@ -18,7 +18,7 @@ export const APP_TAGLINE = "Attendance Intelligence";
 
 /**
  * All supported parent-communication languages.
- * This is the single source of truth — mock data, selectors, and services
+ * This is the single source of truth — selectors and services
  * all reference this array.
  */
 export const SUPPORTED_LANGUAGES = [
@@ -50,16 +50,6 @@ export const ESCALATION_LEVELS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Simulation / Live Mode
-// ---------------------------------------------------------------------------
-
-/**
- * When true, all providers are mocked and no real messages or calls are sent.
- * Flip to false once real providers are configured under Integrations.
- */
-export const SIMULATION_MODE = true;
-
-// ---------------------------------------------------------------------------
 // SMS Configuration
 // ---------------------------------------------------------------------------
 
@@ -72,8 +62,7 @@ export const SIMULATION_MODE = true;
  * - SMS_PROVIDER_ROUTE: MSG91 route ID (1=transactional, 4=promotional, default=4)
  */
 export const SMS_CONFIG = {
-  provider: "msg91" as const,
-  enabled: true,
-  /** Prevent duplicate SMS for same student within 24 hours */
+  provider: "fast2sms" as const,
+  enabled: false,
   deduplicationEnabled: true,
 };

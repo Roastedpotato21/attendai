@@ -12,7 +12,7 @@ port = 54322
 major_version = 15
 
 [db.seed]
-enabled = true
+enabled = false
 sql_paths = ["./seed.sql"]
 
 [studio]

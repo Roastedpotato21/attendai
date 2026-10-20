@@ -2,6 +2,7 @@
  * Voice call data-access service.
  */
 
+import { isSimulatedCommunication } from "./record-metrics";
 import type { CallRecord } from "@/lib/types";
 import type { PlaceCallInput, ProviderResult } from "@/lib/services/communication";
 import { communication } from "@/lib/services/communication";
@@ -12,9 +13,7 @@ export interface VoiceCallService {
   retry(id: string): Promise<ProviderResult>;
 }
 
-const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-export const mockVoiceCallService: VoiceCallService = {
+export const voiceCallService: VoiceCallService = {
   async getAll() {
     const comms = await communicationRepository.findAll();
     const voiceComms = comms.filter((c) => c.type === "voice");
@@ -34,8 +33,12 @@ export const mockVoiceCallService: VoiceCallService = {
           startedAt: c.createdAt,
           durationSec: c.durationSec || 0,
           attempts: c.attempts || 0,
-          status: c.callStatus || "failed",
-          sentiment: c.sentiment || "unreachable",
+          status: isSimulatedCommunication(c)
+            ? "simulated"
+            : c.callStatus === "completed" && !c.providerMessageId
+              ? "unconfirmed"
+              : c.callStatus || "unconfirmed",
+          sentiment: c.sentiment || "unknown",
           parentResponse: c.parentResponse || "",
           aiSummary: c.aiSummary || "",
         });
@@ -47,5 +50,3 @@ export const mockVoiceCallService: VoiceCallService = {
     return communication.voice.retry(id);
   },
 };
-
-export const voiceCallService: VoiceCallService = mockVoiceCallService;

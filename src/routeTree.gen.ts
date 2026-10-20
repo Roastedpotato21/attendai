@@ -21,6 +21,8 @@ import { Route as FacultyRouteImport } from './routes/faculty'
 import { Route as GuardianDevicesRouteImport } from './routes/guardian-devices'
 import { Route as GuardianNotificationsRouteImport } from './routes/guardian-notifications'
 import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as InstitutionReviewRouteImport } from './routes/institution-review'
+import { Route as InstitutionVerificationRouteImport } from './routes/institution-verification'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as InterventionsRouteImport } from './routes/interventions'
 import { Route as LoginRouteImport } from './routes/login'
@@ -94,6 +96,16 @@ const GuardianNotificationsRoute = GuardianNotificationsRouteImport.update({
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstitutionReviewRoute = InstitutionReviewRouteImport.update({
+  id: '/institution-review',
+  path: '/institution-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstitutionVerificationRoute = InstitutionVerificationRouteImport.update({
+  id: '/institution-verification',
+  path: '/institution-verification',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegrationsRoute = IntegrationsRouteImport.update({
@@ -180,6 +192,8 @@ export interface FileRoutesByFullPath {
   '/guardian-devices': typeof GuardianDevicesRoute
   '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
+  '/institution-review': typeof InstitutionReviewRoute
+  '/institution-verification': typeof InstitutionVerificationRoute
   '/integrations': typeof IntegrationsRoute
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
@@ -208,6 +222,8 @@ export interface FileRoutesByTo {
   '/guardian-devices': typeof GuardianDevicesRoute
   '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
+  '/institution-review': typeof InstitutionReviewRoute
+  '/institution-verification': typeof InstitutionVerificationRoute
   '/integrations': typeof IntegrationsRoute
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
@@ -237,6 +253,8 @@ export interface FileRoutesById {
   '/guardian-devices': typeof GuardianDevicesRoute
   '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
+  '/institution-review': typeof InstitutionReviewRoute
+  '/institution-verification': typeof InstitutionVerificationRoute
   '/integrations': typeof IntegrationsRoute
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
@@ -267,6 +285,8 @@ export interface FileRouteTypes {
     | '/guardian-devices'
     | '/guardian-notifications'
     | '/insights'
+    | '/institution-review'
+    | '/institution-verification'
     | '/integrations'
     | '/interventions'
     | '/login'
@@ -295,6 +315,8 @@ export interface FileRouteTypes {
     | '/guardian-devices'
     | '/guardian-notifications'
     | '/insights'
+    | '/institution-review'
+    | '/institution-verification'
     | '/integrations'
     | '/interventions'
     | '/login'
@@ -323,6 +345,8 @@ export interface FileRouteTypes {
     | '/guardian-devices'
     | '/guardian-notifications'
     | '/insights'
+    | '/institution-review'
+    | '/institution-verification'
     | '/integrations'
     | '/interventions'
     | '/login'
@@ -352,6 +376,8 @@ export interface RootRouteChildren {
   GuardianDevicesRoute: typeof GuardianDevicesRoute
   GuardianNotificationsRoute: typeof GuardianNotificationsRoute
   InsightsRoute: typeof InsightsRoute
+  InstitutionReviewRoute: typeof InstitutionReviewRoute
+  InstitutionVerificationRoute: typeof InstitutionVerificationRoute
   IntegrationsRoute: typeof IntegrationsRoute
   InterventionsRoute: typeof InterventionsRoute
   LoginRoute: typeof LoginRoute
@@ -452,6 +478,20 @@ declare module '@tanstack/react-router' {
       path: '/insights'
       fullPath: '/insights'
       preLoaderRoute: typeof InsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/institution-review': {
+      id: '/institution-review'
+      path: '/institution-review'
+      fullPath: '/institution-review'
+      preLoaderRoute: typeof InstitutionReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/institution-verification': {
+      id: '/institution-verification'
+      path: '/institution-verification'
+      fullPath: '/institution-verification'
+      preLoaderRoute: typeof InstitutionVerificationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integrations': {
@@ -568,6 +608,8 @@ const rootRouteChildren: RootRouteChildren = {
   GuardianDevicesRoute: GuardianDevicesRoute,
   GuardianNotificationsRoute: GuardianNotificationsRoute,
   InsightsRoute: InsightsRoute,
+  InstitutionReviewRoute: InstitutionReviewRoute,
+  InstitutionVerificationRoute: InstitutionVerificationRoute,
   IntegrationsRoute: IntegrationsRoute,
   InterventionsRoute: InterventionsRoute,
   LoginRoute: LoginRoute,

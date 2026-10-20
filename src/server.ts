@@ -1,4 +1,5 @@
 import "./lib/error-capture";
+import { handleInstitutionVerificationEvidence } from "./lib/server/institution-verification";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleCommunicationWorkerRequest } from "./lib/server/communication-worker-endpoint";
@@ -80,6 +81,9 @@ async function policyGate(request: Request): Promise<Response | null> {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (new URL(request.url).pathname === "/api/institution-verification/evidence") {
+        return handleInstitutionVerificationEvidence(request);
+      }
       if (new URL(request.url).pathname.startsWith("/api/admin/")) {
         const rejection = await policyGate(request);
         if (rejection) return rejection;

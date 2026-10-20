@@ -94,10 +94,6 @@ const logger = createLogger();
 const generateLogId = () =>
   `twilio-${Date.now()}-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
 
-// Helper: Generate message ID
-const generateMessageId = () =>
-  `msg-${Date.now()}-${Math.random().toString(36).slice(2, 12).toUpperCase()}`;
-
 // Helper: Format phone number (basic E.164 validation)
 const formatPhoneNumber = (phone: string): string => {
   // Remove all non-digits
@@ -148,7 +144,7 @@ export const twilioSmsProvider = {
 
         return {
           ok: false,
-          messageId: generateMessageId(),
+          messageId: "",
           provider: "twilio",
           status: "provider-error",
           timestamp,
@@ -166,7 +162,7 @@ export const twilioSmsProvider = {
           logger.error(`[${logId}] Test mode enabled but SMS_TEST_RECIPIENT not configured`);
           return {
             ok: false,
-            messageId: generateMessageId(),
+            messageId: "",
             provider: "twilio",
             status: "provider-error",
             timestamp,
@@ -220,7 +216,7 @@ export const twilioSmsProvider = {
 
         return {
           ok: false,
-          messageId: generateMessageId(),
+          messageId: "",
           provider: "twilio",
           status: "provider-error",
           timestamp,
@@ -232,7 +228,8 @@ export const twilioSmsProvider = {
       }
 
       // 6. Success response
-      const messageId = data.sid || generateMessageId();
+      if (!data.sid) throw new Error("Twilio did not return a provider message ID.");
+      const messageId = data.sid;
       logger.info(`[${logId}] SMS sent successfully`, {
         twilioSid: messageId,
         status: data.status,
@@ -256,7 +253,7 @@ export const twilioSmsProvider = {
 
       return {
         ok: false,
-        messageId: generateMessageId(),
+        messageId: "",
         provider: "twilio",
         status: "provider-error",
         timestamp,
@@ -317,51 +314,13 @@ export const twilioSmsProvider = {
   },
 };
 
-/**
- * Mock Twilio Provider for development
- * Simulates SMS without real Twilio calls
- */
-export const mockTwilioProvider = {
-  async send(input: TwilioSmsInput): Promise<TwilioSmsResult> {
-    const logId = generateLogId();
-    const messageId = generateMessageId();
-    const testMode = process.env["SMS_TEST_MODE"] === "true";
-    const testRecipient = process.env["SMS_TEST_RECIPIENT"];
-
-    logger.info(`[${logId}] Mock SMS send`, {
-      studentName: input.studentName,
-      parentName: input.parentName,
-      recipient: testMode ? testRecipient : input.to,
-      testMode,
-    });
-
-    // Simulate small network delay
-    await new Promise((r) => setTimeout(r, 200));
-
-    return {
-      ok: true,
-      messageId,
-      provider: "twilio(mock)",
-      status: "sent",
-      timestamp: new Date().toISOString(),
-      recipientNumber: testMode ? testRecipient || input.to : input.to,
-      isTestMode: testMode,
-      logId,
-    };
-  },
-
-  async getMessageStatus() {
-    return {
-      status: "delivered" as const,
-    };
-  },
-};
-
-/**
- * Get appropriate provider based on configuration
- */
 export function getTwilioProvider() {
-  // Legacy callers have no durable job, consent check, or dispatch fence.
-  // Credentials must never turn this path into paid delivery.
-  return mockTwilioProvider;
+  return {
+    async send(_input: TwilioSmsInput): Promise<TwilioSmsResult> {
+      throw new Error("Legacy SMS delivery is disabled. Use the server communication worker.");
+    },
+    async getMessageStatus(): Promise<{ status: string }> {
+      throw new Error("Legacy SMS status lookup is disabled.");
+    },
+  };
 }

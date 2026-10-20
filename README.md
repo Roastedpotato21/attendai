@@ -14,6 +14,15 @@ npm i
 npm run dev
 ```
 
+Supabase is required; configure the browser values in `.env.example`. Demo
+sign-in and automatic sample data are not supported. Production cleanup
+findings and the read-only database audit are documented in
+[`docs/production-data-cleanup.md`](docs/production-data-cleanup.md).
+
+Institution registration requires independent existence and representative
+authority review. The workflow, additive migrations and production setup are in
+[`docs/institution-verification.md`](docs/institution-verification.md).
+
 ## Built with
 
 - TanStack Start

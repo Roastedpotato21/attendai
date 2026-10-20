@@ -297,7 +297,7 @@ function FacultyPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => toast.success(`Digest sent to ${f.name}`)}
+                          onClick={() => toast.info("Faculty digests are not available.")}
                         >
                           Send digest
                         </Button>

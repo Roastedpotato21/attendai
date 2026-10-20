@@ -14,7 +14,7 @@ import { handleControlledSmsTrial } from "../src/lib/server/controlled-sms-trial
 import { readFast2SmsAccount } from "../src/lib/server/fast2sms-account.ts";
 import { handleSmsTransportTest } from "../src/lib/server/sms-transport-test.ts";
 
-process.env.FAST2SMS_API_KEY = "unit-fast-secret";
+process.env.FAST2SMS_API_KEY = "test-fast2sms-api-key";
 test("controlled send rejects an unconfigured or mismatched execution before touching data", async () => {
   delete process.env.SMS_TRIAL_EXECUTION_KEY;
   const request = () =>
@@ -50,7 +50,7 @@ test("Quick SMS uses one authenticated POST, a single Indian number and the rend
   assert.equal(calls.at(-1).url, "https://www.fast2sms.com/dev/bulkV2");
   assert.equal(calls.at(-1).options.method, "POST");
   assert.equal(calls.at(-1).options.redirect, "manual");
-  assert.equal(calls.at(-1).options.headers.Authorization, "unit-fast-secret");
+  assert.equal(calls.at(-1).options.headers.Authorization, "test-fast2sms-api-key");
   assert.deepEqual(JSON.parse(calls.at(-1).options.body), {
     route: "q",
     numbers: "9876543210",
@@ -65,14 +65,14 @@ test("explicit rejection persists code and sanitized detail with no retry", asyn
     Response.json({
       return: false,
       status_code: 412,
-      message: "unit-fast-secret rejected +919876543210",
+      message: "test-fast2sms-api-key rejected +919876543210",
     });
   const before = calls.length;
   const result = await provider.send(input);
   assert.equal(result.errorClass, "permanent");
   assert.equal(result.providerCode, "412");
   assert.equal(result.httpStatus, 200);
-  assert.doesNotMatch(result.message, /unit-fast-secret|9876543210/);
+  assert.doesNotMatch(result.message, /test-fast2sms-api-key|9876543210/);
   assert.equal(calls.length, before + 1);
 });
 
@@ -123,27 +123,27 @@ test("invalid destinations and retired Twilio never make a provider request", as
   assert.equal((await new TwilioProvider().send()).ok, false);
   delete process.env.FAST2SMS_API_KEY;
   assert.equal((await provider.send(input)).ok, false);
-  process.env.FAST2SMS_API_KEY = "unit-fast-secret";
+  process.env.FAST2SMS_API_KEY = "test-fast2sms-api-key";
   assert.equal(calls.length, before);
 });
 
 test("diagnostics retain HTTP and sanitized body on parse and stream failures", async () => {
-  reply = () => new Response("unit-fast-secret +919876543210 invalid json", { status: 502 });
+  reply = () => new Response("test-fast2sms-api-key +919876543210 invalid json", { status: 502 });
   let result = await provider.send(input);
   assert.equal(result.httpStatus, 502);
   assert.equal(result.diagnostics.stage, "parse_json");
-  assert.doesNotMatch(JSON.stringify(result), /unit-fast-secret|9876543210/);
+  assert.doesNotMatch(JSON.stringify(result), /test-fast2sms-api-key|9876543210/);
   reply = () => ({
     status: 403,
     text: async () => {
-      throw new Error("unit-fast-secret body error");
+      throw new Error("test-fast2sms-api-key body error");
     },
   });
   result = await provider.send(input);
   assert.equal(result.httpStatus, 403);
   assert.equal(result.diagnostics.stage, "read_body");
-  assert.doesNotMatch(JSON.stringify(result), /unit-fast-secret/);
-  reply = new TypeError("unit-fast-secret outbound failure");
+  assert.doesNotMatch(JSON.stringify(result), /test-fast2sms-api-key/);
+  reply = new TypeError("test-fast2sms-api-key outbound failure");
   result = await provider.send(input);
   assert.equal(result.diagnostics.stage, "fetch");
   assert.match(result.diagnostics.error, /outbound failure/);
@@ -222,7 +222,7 @@ test("operator endpoints require authorization and reveal secret presence only",
   );
   const text = await response.text();
   assert.equal(JSON.parse(text).secretPresent, true);
-  assert.doesNotMatch(text, /unit-fast-secret/);
+  assert.doesNotMatch(text, /test-fast2sms-api-key/);
 });
 test("dedicated transport test rejects a mismatched execution before database access", async () => {
   const response = await handleSmsTransportTest(

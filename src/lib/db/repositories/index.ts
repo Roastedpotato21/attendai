@@ -10,4 +10,3 @@ export * from "./intervention";
 export * from "./sms";
 export * from "./faculty";
 export * from "./escalation";
-export { memoryDb } from "../connection";

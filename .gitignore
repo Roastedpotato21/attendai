@@ -38,10 +38,15 @@ supabase/.temp/
 *.pfx
 *.p12
 *service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+/credentials.json
+/secrets.json
 
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+.dev.vars.*
 
 # Testing & Coverage
 .tmp/

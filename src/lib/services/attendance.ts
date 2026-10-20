@@ -16,6 +16,14 @@ import type {
 } from "@/lib/types";
 import type { DbAttendanceRecord, DbAttendanceSession, DbClass } from "../db/schema";
 import { attendanceRepository, classRepository, studentRepository } from "../db/repositories";
+import { format, subDays } from "date-fns";
+import {
+  attendancePercentage,
+  isSimulatedCommunication,
+  todayDate,
+  studentHistoryMetrics,
+} from "./record-metrics";
+import { communicationRepository } from "../db/repositories";
 import { NotFoundError, ValidationError } from "../db/errors";
 
 export interface AttendanceService {
@@ -41,9 +49,11 @@ export const attendanceService: AttendanceService = {
   },
 
   async getRegister(classId, date) {
-    const [roster, session] = await Promise.all([
+    const [roster, session, allSessions, history] = await Promise.all([
       studentRepository.findByClassId(classId),
       attendanceRepository.findSessionByClassDate(classId, date),
+      attendanceRepository.findAllSessions(),
+      attendanceRepository.findAllRecords(),
     ]);
     const records = session ? await attendanceRepository.findRecordsBySessionId(session.id) : [];
     return {
@@ -58,38 +68,75 @@ export const attendanceService: AttendanceService = {
         parentName: s.parent.name,
         parentPhone: s.parent.phone,
         language: s.parent.language,
-        attendanceRate: s.attendanceRate,
-        consecutiveAbsences: s.consecutiveAbsences,
-        status: s.status,
-        risk: s.risk,
+        ...studentHistoryMetrics(s.id, allSessions, history),
+        status: records.find((record) => record.studentId === s.id)?.status ?? "unmarked",
       })),
     };
   },
   async getTrend(): Promise<AttendanceTrend[]> {
-    return [
-      { day: "Mon", present: 94, absent: 6, calls: 4 },
-      { day: "Tue", present: 96, absent: 4, calls: 3 },
-      { day: "Wed", present: 91, absent: 9, calls: 7 },
-      { day: "Thu", present: 95, absent: 5, calls: 4 },
-      { day: "Fri", present: 89, absent: 11, calls: 8 },
-    ];
+    const [sessions, records, communications] = await Promise.all([
+      attendanceRepository.findAllSessions(),
+      attendanceRepository.findAllRecords(),
+      communicationRepository.findAll(),
+    ]);
+    const cutoff = format(subDays(new Date(), 6), "yyyy-MM-dd");
+    const dates = [...new Set(sessions.map((session) => session.date))]
+      .filter((date) => date >= cutoff && date <= todayDate())
+      .sort();
+    return dates.flatMap((date) => {
+      const ids = new Set(
+        sessions.filter((session) => session.date === date).map((session) => session.id),
+      );
+      const percentage = attendancePercentage(
+        records.filter((record) => ids.has(record.sessionId)),
+      );
+      if (percentage === null) return [];
+      return [
+        {
+          day: date,
+          present: percentage,
+          absent: 100 - percentage,
+          calls: communications.filter(
+            (record) =>
+              record.type === "voice" &&
+              !isSimulatedCommunication(record) &&
+              format(new Date(record.createdAt), "yyyy-MM-dd") === date,
+          ).length,
+        },
+      ];
+    });
   },
 
   async getClassAttendance(): Promise<ClassAttendance[]> {
-    const classes = await classRepository.findAll();
-    return classes.map((c) => ({
-      className: c.name,
-      rate: 94,
-      absent: 2,
-    }));
+    const [classes, sessions, records] = await Promise.all([
+      classRepository.findAll(),
+      attendanceRepository.findAllSessions(),
+      attendanceRepository.findAllRecords(),
+    ]);
+    return classes.flatMap((cls) => {
+      const ids = new Set(
+        sessions.filter((session) => session.classId === cls.id).map((session) => session.id),
+      );
+      const marked = records.filter((record) => ids.has(record.sessionId));
+      const rate = attendancePercentage(marked);
+      return rate === null
+        ? []
+        : [
+            {
+              className: cls.fullName,
+              rate,
+              absent: marked.filter((record) => record.status === "absent").length,
+            },
+          ];
+    });
   },
 
   async getLanguageSplit(): Promise<LanguageSplit[]> {
-    return [
-      { name: "English", value: 38 },
-      { name: "Hindi", value: 35 },
-      { name: "Telugu", value: 27 },
-    ];
+    const students = await studentRepository.findAll();
+    const counts = new Map<string, number>();
+    for (const student of students)
+      counts.set(student.parent.language, (counts.get(student.parent.language) ?? 0) + 1);
+    return Array.from(counts, ([name, value]) => ({ name, value }));
   },
 
   async getStudentDashboard(studentId: string): Promise<StudentDashboardData> {
@@ -128,7 +175,7 @@ export const attendanceService: AttendanceService = {
 
     const total = presentCount + absentCount + lateCount;
     const overallPercentage =
-      total > 0 ? Math.round(((presentCount + lateCount) / total) * 100) : 100;
+      total > 0 ? Math.round(((presentCount + lateCount) / total) * 100) : null;
 
     return {
       overallPercentage,

@@ -33,10 +33,10 @@ supabase db reset
 supabase test db
 ```
 
-The local reset applies all migrations and then loads `seed.sql`. The database
-tests use a transaction and roll their fixtures back. Before loading seed data
-into a remote project, independently confirm that the linked project is a
-dedicated development environment; do not seed production.
+Automatic seeding is disabled and `seed.sql` contains no data. The isolated
+`npm run test:postgres` command explicitly loads `tests/fixtures.sql` into a
+disposable database. Never load that fixture file into production. Existing
+SQL tests that need those fixtures should run through that command.
 
 After a linked migration, run `verification/verify_phase_2.sql` through a
 read-only-capable PostgreSQL session to verify the actual catalog. Run
@@ -60,22 +60,21 @@ role, and faculty/class assignment policies.
 
 ## Staff provisioning flow
 
-New institutions use the public **Create an administrator account** link on
-`/login`. Supabase Auth creates the identity and sends its verification email;
-after verification, the `provision_my_new_institution()` RPC atomically creates
-one institution, the caller's active membership, and the caller's `admin` role.
-The RPC accepts no role or institution input, rejects student identities and
-existing memberships, and is idempotent only for the original first admin.
+New institutions begin with registry search at `/create-account`. Email
+verification creates only an applicant identity. The seven-step
+`/institution-verification` workflow requires independently reviewed existence,
+authority documents, a fresh photo challenge and official-contact confirmation.
+Only an independent platform reviewer can activate the institution and its
+initial owner atomically. Pending applicants receive no tenant membership or role.
 
-Add the deployed `/create-account` URL to Supabase Auth's Redirect URLs list
-alongside `/accept-invite`. Keep email confirmation enabled for the intended
-verify-before-provisioning flow.
+Migrations `00025` through `00029` disable both legacy institution-provisioning
+RPCs. The direct admin bootstrap script is retired; there is no public or
+internal bootstrap HTTP endpoint. Existing active tenants remain active.
+See [institution verification operations](../docs/institution-verification.md)
+for registry imports, reviewer appointment, private storage and retention.
 
-AttendAI uses Supabase Auth invitations rather than administrator-created
-passwords. First provision one trusted administrator through the protected
-`POST /api/internal/bootstrap-admin` endpoint. The request requires the
-server-only `ATTENDAI_BOOTSTRAP_SECRET`; it sends an invitation and links the
-Auth user to the supplied institution with the `admin` role.
+Add the deployed `/institution-verification` and `/accept-invite` URLs to
+Supabase Auth's Redirect URLs list. Keep email confirmation enabled.
 
 Once signed in, that administrator can use **Faculty & Classes → Invite
 staff**. The server verifies the caller's active institution-admin assignment,
@@ -85,7 +84,7 @@ AttendAI password at `/accept-invite`, and reaches the dashboard only after
 the same membership and role validation used at password login succeeds.
 
 Add the deployed `/accept-invite` URL to Supabase Auth's Redirect URLs list.
-Never put `SUPABASE_SERVICE_ROLE_KEY` or `ATTENDAI_BOOTSTRAP_SECRET` in a
+Never put `SUPABASE_SERVICE_ROLE_KEY` in a
 `VITE_` environment variable.
 
 `00005_phase_2_multi_tenancy.sql` is a forward migration. Because every schema
@@ -94,9 +93,9 @@ Phase-2 rows into the fixed legacy institution before making tenant keys
 required. Review and rename that legacy institution after migration if the
 development project already contains real fixture data.
 
-The fixture data is historical sample data only. It performs no communication,
-AI, QR, reporting, or automation action.
+Synthetic data belongs only in isolated tests (`supabase/tests/fixtures.sql`);
+the production seed contains no synthetic institution records.
 
-`seed.sql` contains two institutions with deliberately overlapping class,
+`tests/fixtures.sql` contains two institutions with deliberately overlapping class,
 admission, and employee identifiers. `tests/database/phase_2_tenant_isolation.sql`
 exercises cross-tenant RLS and relationship attacks transactionally.
