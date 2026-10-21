@@ -34,8 +34,9 @@ not as a standalone component product.
 At the user's explicit direction, the badge preserves the reference's own look:
 plain black woven strap, white rounded glossy card, silver clip/ring, original
 geometry, size fraction, strap length and motion settings. Only its container is
-compact. The face follows the supplied screenshot's layout: small real profile
-name at the top right and the large uploaded portrait below. No React logo,
+compact. The uploaded photo fills the entire badge face using the reference's
+`cover` fit, with no added border, inset, name strip or image overlay. The static
+fallback uses the same photo edge to edge. No React logo,
 creator handle, reference portrait, brown tint, cream card or branded ID layout
 is used. No reference artwork assets are shipped.
 Three.js is loaded lazily only in the signed-in badge. The upstream implementation

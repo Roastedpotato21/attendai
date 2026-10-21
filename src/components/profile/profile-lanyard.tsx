@@ -16,55 +16,29 @@ import "./profile-lanyard.css";
 import "./lanyard/lanyard.css";
 const Lanyard = lazy(() => import("./lanyard/lanyard"));
 
-/** Reference face layout: white portrait card, small name top right, photo below. */
-async function profileBadgeFace(photo: string | null, name: string) {
+/** Only used until the person uploads their own image. */
+function emptyBadgeFace(name: string) {
   const canvas = document.createElement("canvas");
   canvas.width = 640;
   canvas.height = 900;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Badge preview unavailable.");
-  context.fillStyle = "#ffffff";
+  if (!context) return undefined;
+  context.fillStyle = "#f4f4f4";
   context.fillRect(0, 0, 640, 900);
   context.fillStyle = "#777777";
-  context.font = "28px Arial, sans-serif";
-  context.textAlign = "right";
-  context.fillText(name, 610, 65, 270);
-  if (photo) {
-    const image = new Image();
-    image.src = photo;
-    await image.decode();
-    const areaHeight = 774,
-      ratio = 640 / areaHeight;
-    const cropWidth = Math.min(image.naturalWidth, image.naturalHeight * ratio);
-    const cropHeight = cropWidth / ratio;
-    context.drawImage(
-      image,
-      (image.naturalWidth - cropWidth) / 2,
-      (image.naturalHeight - cropHeight) / 2,
-      cropWidth,
-      cropHeight,
-      0,
-      126,
-      640,
-      areaHeight,
-    );
-  } else {
-    context.fillStyle = "#f4f4f4";
-    context.fillRect(0, 126, 640, 774);
-    context.fillStyle = "#777777";
-    context.textAlign = "center";
-    context.font = "100px Arial, sans-serif";
-    context.fillText(
-      name
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join("")
-        .toUpperCase(),
-      320,
-      550,
-    );
-  }
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.font = "100px Arial, sans-serif";
+  context.fillText(
+    name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase(),
+    320,
+    450,
+  );
   return canvas.toDataURL("image/png");
 }
 
@@ -81,7 +55,8 @@ export function ProfileLanyard({
   const query = useStaffPhoto(institution);
   const cache = useQueryClient();
   const photo = query.data?.data_url ?? null;
-  const [face, setFace] = useState<string>();
+  const [placeholder, setPlaceholder] = useState<string>();
+  const face = photo ?? placeholder;
 
   const [motion, setMotion] = useState(false);
   const [rendered, setRendered] = useState(false);
@@ -91,18 +66,8 @@ export function ProfileLanyard({
   const [error, setError] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    let live = true;
-    void profileBadgeFace(photo, name)
-      .then((value) => {
-        if (live) setFace(value);
-      })
-      .catch(() => {
-        if (live) setFace(undefined);
-      });
-    return () => {
-      live = false;
-    };
-  }, [photo, name]);
+    setPlaceholder(emptyBadgeFace(name));
+  }, [name]);
   useEffect(() => {
     const media = matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setMotion(!media.matches);
@@ -147,7 +112,7 @@ export function ProfileLanyard({
         </div>
         {motion && face && (
           <Suspense fallback={null}>
-            <Lanyard frontImage={face} backImage={face} />
+            <Lanyard frontImage={face} backImage={face} imageFit="cover" />
           </Suspense>
         )}
       </div>

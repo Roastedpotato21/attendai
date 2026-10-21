@@ -640,6 +640,19 @@ try {
     "static reduced-motion badge",
   );
   assert.ok(await client.evaluate("!document.querySelector('.profile-badge-fallback').hidden"));
+  assert.ok(
+    await client.evaluate(
+      "document.querySelector('.profile-badge-fallback img').src === document.querySelector('img[alt=\"Your profile photo\"]').src",
+    ),
+    "badge uses the full saved photo without an added header or image frame",
+  );
+  assert.equal(
+    await client.evaluate(
+      "getComputedStyle(document.querySelector('.profile-badge-fallback > div')).borderTopWidth",
+    ),
+    "0px",
+    "static badge has no border",
+  );
   await client.call("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
   });
