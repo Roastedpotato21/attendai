@@ -30,6 +30,10 @@ export type VerificationDetails = {
   authority_statement: string;
 };
 export type VerificationApplication = VerificationDetails & {
+  purpose?: "initial" | "ownership_recovery" | "leadership_replacement";
+  requested_capability?: "institution_owner" | "institution_admin";
+  expected_owner_profile_id?: string | null;
+  request_reason?: string | null;
   id: string;
   institution_id: string;
   registry_id: string | null;

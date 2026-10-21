@@ -285,6 +285,7 @@ function InstitutionReview() {
                 }
               >
                 <strong>{app.institution_name}</strong>
+                <span className="block">{(app.purpose ?? "initial").replaceAll("_", " ")}</span>
                 <span className="block">
                   {app.state} · {verificationLabels[app.status]}
                 </span>
@@ -307,6 +308,17 @@ function InstitutionReview() {
                     <CardTitle>{selected.institution_name}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2 text-sm">
+                    {selected.purpose && selected.purpose !== "initial" && (
+                      <div className="rounded border border-destructive p-3">
+                        <strong>{selected.purpose.replaceAll("_", " ")}</strong>
+                        <p>
+                          Approval grants {selected.requested_capability?.replaceAll("_", " ")} to
+                          this successor. Confirm the current leadership situation independently.
+                          The original institutional verification remains unchanged.
+                        </p>
+                        <p>{selected.request_reason}</p>
+                      </div>
+                    )}
                     <p>
                       {selected.state} · {selected.city} · {selected.institution_type}
                     </p>

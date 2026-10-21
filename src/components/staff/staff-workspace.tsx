@@ -92,6 +92,9 @@ export function StaffWorkspacePage() {
           {staff?.staff_code && <p>Staff ID: {staff.staff_code}</p>}
           <p>Active roles: {workspace.roles.map((role) => roleLabels[role] ?? role).join(", ")}</p>
           <p>Primary department: {workspace.primary_department ?? "Not assigned"}</p>
+          <Link to="/institution-verification" className="block underline">
+            Authority review / emergency ownership recovery
+          </Link>
         </CardContent>
       </Card>
       {workspace.can_manage_setup && (

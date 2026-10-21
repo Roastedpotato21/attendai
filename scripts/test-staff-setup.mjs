@@ -18,6 +18,8 @@ test("dated roles use institution dates and exclude expired, scheduled or closed
   assert.equal(currentRoleGrant({ ...role, valid_from: "2026-10-22" }, date), false);
   assert.equal(currentRoleGrant({ ...role, valid_until: "2026-10-20" }, date), false);
   assert.equal(currentRoleGrant({ ...role, active: false }, date), false);
+  assert.equal(currentRoleGrant({ ...role, ended_on: "2026-10-20" }, date), false);
+  assert.equal(currentRoleGrant({ ...role, ended_on: date }, date), true);
   assert.equal(staffRouteAllowed("/attendance", true, false, true), true);
   assert.equal(staffRouteAllowed("/messages", true, false, true), false);
 });

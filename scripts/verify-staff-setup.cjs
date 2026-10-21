@@ -605,8 +605,12 @@ module.exports = async function verifyStaffSetup(db, { owner, other, institution
       0,
     );
     await db.query(
-      "UPDATE public.staff_role_grants SET valid_from='2020-01-01',valid_until='2021-01-01' WHERE staff_id=$1 AND active",
+      "UPDATE public.staff_role_grants SET active=false,closed_at=now() WHERE staff_id=$1 AND active",
       [legacyStaff],
+    );
+    await db.query(
+      "INSERT INTO public.staff_role_grants(institution_id,staff_id,role,valid_from,valid_until,reason) VALUES($1,$2,'faculty','2020-01-01','2021-01-01','Isolated expired role fixture for stale-access regression.')",
+      [institution, legacyStaff],
     );
     await role(legacy);
     assert.equal(

@@ -478,6 +478,12 @@ module.exports = async function verifyInstitutionWorkflow(db) {
       other: outsider,
       institution,
     });
+    await require("./verify-staff-lifecycle.cjs")(db, {
+      owner: applicant,
+      reviewer,
+      other: outsider,
+      institution,
+    });
     await role(outsider);
     await denied(
       "SELECT public.start_institution_verification($1,$2)",

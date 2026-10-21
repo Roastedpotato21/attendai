@@ -220,6 +220,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [router]);
 
+  // Recheck live database grants after owner/role changes in another session.
+  // RLS/RPC checks enforce revocation immediately, independently of this refresh.
+  useEffect(() => {
+    if (!user?.staffModel) return;
+    let live = true;
+    let running = false;
+    const refreshAccess = async () => {
+      if (running) return;
+      running = true;
+      try {
+        const { data } = await supabase.auth.getUser();
+        const access = data.user ? await userRepository.resolveStaffAccess(data.user.id) : null;
+        if (!live) return;
+        if (access?.status === "allowed") setUser(staffAccessUser(access));
+        else {
+          setUser(null);
+          setVerificationAccess(false);
+        }
+      } catch {
+        if (live) {
+          setUser(null);
+          setVerificationAccess(false);
+        }
+      } finally {
+        running = false;
+      }
+    };
+    const timer = window.setInterval(() => void refreshAccess(), 30_000);
+    const focus = () => void refreshAccess();
+    window.addEventListener("focus", focus);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", focus);
+    };
+  }, [user?.id, user?.staffModel, user?.institutionId]);
+
   // -------------------------------------------------------------------------
   // Login: email + password
   // V5 FIX: This is now the single source of truth — no module-level currentUser.

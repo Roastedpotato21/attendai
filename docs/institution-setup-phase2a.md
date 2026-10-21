@@ -1,5 +1,8 @@
 # Problem #2 — Phase 2A: institution setup and staff model
 
+This document describes the Phase 2A baseline. Ownership and lifecycle extensions
+are documented in [Phase 2B](institution-setup-phase2b.md).
+
 Status: implemented and locally validated. Production migrations and deployment
 have not been performed. No production staff identities or invitation links were
 created by the tests.

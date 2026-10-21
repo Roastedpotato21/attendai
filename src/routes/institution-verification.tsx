@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/auth-context";
 import { InstitutionSearch } from "@/components/auth/institution-search";
 import { VerificationPolicyGate } from "@/components/auth/verification-policy-gate";
+import { StaffAuthorityRequest } from "@/components/staff/staff-authority-request";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -291,6 +292,14 @@ function InstitutionVerificationPage() {
         </p>
       )}
       <VerificationPolicyGate>
+        <StaffAuthorityRequest />
+        {application?.purpose && application.purpose !== "initial" && (
+          <p className="rounded border p-3">
+            {application.purpose.replaceAll("_", " ")}: fresh authority review for{" "}
+            {application.requested_capability?.replaceAll("_", " ")}. Current ownership changes only
+            after independent approval.
+          </p>
+        )}
         {!access?.allowed ? (
           <p>
             Your account cannot submit a new institution claim. Existing staff must use their
@@ -562,8 +571,8 @@ function InstitutionVerificationPage() {
                   {application.status === "approved" ? (
                     <>
                       <p>
-                        Verification approved. You are the initial institution owner and authorized
-                        administrator.
+                        This verification review was approved. Current ownership and staff access
+                        follow the institution's recorded lifecycle and roles.
                       </p>
                       <Button onClick={() => window.location.assign("/")}>
                         Continue to dashboard
@@ -576,9 +585,10 @@ function InstitutionVerificationPage() {
                     </p>
                   ) : (
                     <p>
-                      Institution access remains pending. Student, faculty, attendance and guardian
-                      communication operations are blocked until approval. Submission does not
-                      guarantee approval.
+                      {application.purpose && application.purpose !== "initial"
+                        ? "Authority review is pending. This request grants no new capability; existing staff access follows current membership and roles."
+                        : "Institution access remains pending. Protected operations are blocked until approval."}{" "}
+                      Submission does not guarantee approval.
                     </p>
                   )}
                   {files()}

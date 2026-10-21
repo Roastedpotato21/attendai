@@ -27,6 +27,10 @@ Institution profiles, academic structure, staff roles, scoped responsibilities
 and private invitation links are documented in
 [`docs/institution-setup-phase2a.md`](docs/institution-setup-phase2a.md).
 
+Ownership transfer, staff leave/deactivation, responsibility handover and reviewed
+emergency succession are documented in
+[`docs/institution-setup-phase2b.md`](docs/institution-setup-phase2b.md).
+
 ## Built with
 
 - TanStack Start

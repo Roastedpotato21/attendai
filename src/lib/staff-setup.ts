@@ -67,7 +67,7 @@ export type Staff = {
   staff_code: string | null;
   primary_department_id: string | null;
   designation: string;
-  status: "draft" | "invited" | "active";
+  status: "draft" | "invited" | "active" | "on_leave" | "inactive" | "left_institution";
 };
 export type StaffDetails = {
   full_name: string;
@@ -111,6 +111,10 @@ export type Responsibility = Omit<
   subject_id: string | null;
   active: boolean;
   closed_at: string | null;
+  ended_on?: string | null;
+  end_reason?: string | null;
+  handover_from_id?: string | null;
+  substitution_for_id?: string | null;
 };
 export type RoleGrant = {
   id: string;
@@ -120,6 +124,8 @@ export type RoleGrant = {
   valid_until: string | null;
   active: boolean;
   closed_at: string | null;
+  ended_on?: string | null;
+  end_reason?: string | null;
   reason: string;
 };
 export function institutionDay(timezone: string, now = new Date()): string {
@@ -136,7 +142,12 @@ export function institutionDay(timezone: string, now = new Date()): string {
   return parts["year"] + "-" + parts["month"] + "-" + parts["day"];
 }
 export function currentRoleGrant(role: RoleGrant, day: string): boolean {
-  return role.active && role.valid_from <= day && (!role.valid_until || role.valid_until >= day);
+  return (
+    role.active &&
+    role.valid_from <= day &&
+    (!role.valid_until || role.valid_until >= day) &&
+    (!role.ended_on || role.ended_on >= day)
+  );
 }
 export type AuditEntry = {
   id: string;

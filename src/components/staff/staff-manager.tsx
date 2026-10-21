@@ -16,8 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { StaffLifecyclePanel } from "./staff-lifecycle";
+import { useAuth } from "@/components/auth/auth-context";
 type RoleSelection = string[];
 function Roles({ value, onChange }: { value: RoleSelection; onChange: (roles: string[]) => void }) {
+  const { user } = useAuth();
+  const canAssignAdmin = user?.setupRoles?.includes("institution_owner") === true;
   return (
     <fieldset className="grid gap-2 md:grid-cols-2">
       <legend className="mb-2 font-medium">System roles</legend>
@@ -26,6 +30,7 @@ function Roles({ value, onChange }: { value: RoleSelection; onChange: (roles: st
           <input
             type="checkbox"
             checked={value.includes(role)}
+            disabled={role === "institution_admin" && !canAssignAdmin}
             onChange={(e) =>
               onChange(e.target.checked ? [...value, role] : value.filter((r) => r !== role))
             }
@@ -681,7 +686,7 @@ export function StaffManager({
                 Save roles
               </Button>
             </div>
-            {staff.status !== "active" && (
+            {["draft", "invited"].includes(staff.status) && (
               <div className="space-y-3">
                 <Button
                   variant="outline"
@@ -724,8 +729,10 @@ export function StaffManager({
                     <p>
                       {a.academic_year} · {a.effective_from} — {a.effective_until} ·{" "}
                       {a.active ? "active" : "closed"}
+                      {a.ended_on ? ` · actual end ${a.ended_on}` : ""}
                     </p>
                     <p className="text-sm">{a.reason}</p>
+                    {a.end_reason && <p className="text-sm">Closure: {a.end_reason}</p>}
                     {a.active && (
                       <Button
                         variant="outline"
@@ -754,6 +761,7 @@ export function StaffManager({
                   .map((r) => (
                     <li key={r.id}>
                       {roleLabels[r.role]} · {r.valid_from} — {r.valid_until ?? "open ended"} ·{" "}
+                      {r.ended_on ? `actual end ${r.ended_on} · ` : ""}
                       {!r.active
                         ? "closed"
                         : currentRoleGrant(r, today)
@@ -769,6 +777,15 @@ export function StaffManager({
           </CardContent>
         </Card>
       )}
+      <StaffLifecyclePanel
+        key={selected || "institution"}
+        id={id}
+        catalog={catalog}
+        profile={profile}
+        busy={busy}
+        act={act}
+        staff={staff}
+      />
     </div>
   );
 }

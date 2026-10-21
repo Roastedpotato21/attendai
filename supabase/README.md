@@ -101,6 +101,11 @@ development project already contains real fixture data.
 Synthetic data belongs only in isolated tests (`supabase/tests/fixtures.sql`);
 the production seed contains no synthetic institution records.
 
+Phase 2B migrations `00034`–`00036` add atomic ownership transfer, staff lifecycle,
+dated handover, access revocation and independently reviewed emergency succession.
+Apply after Phase 2A and before the frontend. See
+[ownership and staff lifecycle operations](../docs/institution-setup-phase2b.md).
+
 `tests/fixtures.sql` contains two institutions with deliberately overlapping class,
 admission, and employee identifiers. `tests/database/phase_2_tenant_isolation.sql`
 exercises cross-tenant RLS and relationship attacks transactionally.

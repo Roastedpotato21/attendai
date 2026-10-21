@@ -107,7 +107,18 @@ async function fill(client, selector, value) {
       JSON.stringify(selector) +
       "); if (!(input instanceof HTMLInputElement)) throw new Error('Missing input'); input.scrollIntoView({block:'center'}); input.focus(); input.select(); })()",
   );
-  await client.call("Input.insertText", { text: value });
+  const dateInput = await client.evaluate(
+    "document.querySelector(" + JSON.stringify(selector) + ")?.type === 'date'",
+  );
+  if (dateInput)
+    await client.evaluate(
+      "(()=>{const input=document.querySelector(" +
+        JSON.stringify(selector) +
+        ");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input," +
+        JSON.stringify(value) +
+        ");input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));})()",
+    );
+  else await client.call("Input.insertText", { text: value });
   await waitFor(
     client,
     "document.querySelector(" + JSON.stringify(selector) + ")?.value === " + JSON.stringify(value),
@@ -387,6 +398,58 @@ function installStaffFixture() {
         assignments: isOwner ? [] : [assignment],
       });
     if (rpc === "institution_setup_profile") return json(profile);
+    if (rpc === "staff_lifecycle_overview")
+      return json({
+        candidates: staff
+          .filter((s) => s.status === "active")
+          .map((s) => ({
+            id: s.id,
+            profile_id: s.profile_id,
+            name: s.full_name,
+            email: s.email,
+            designation: s.designation,
+          })),
+        events: [],
+        succession: null,
+        single_hod: false,
+        legacy_duties: [],
+      });
+    if (rpc === "staff_authority_status") return json([]);
+    if (rpc === "start_staff_authority_review")
+      return json(
+        { message: "Fixture authority review is already pending; no capability granted." },
+        409,
+      );
+    if (rpc === "transfer_institution_ownership")
+      return json({ message: "Fixture owner changed; refresh successor details." }, 409);
+    if (rpc === "change_staff_lifecycle") {
+      const target = staff.find((s) => s.id === body.p_staff);
+      target.status = body.p_status;
+      grants
+        .filter((r) => r.staff_id === target.id)
+        .forEach((r) => {
+          r.active = false;
+        });
+      if (target.id === assignment.staff_id) assignment.active = false;
+      return json(null);
+    }
+    if (rpc === "reactivate_staff") {
+      staff.find((s) => s.id === body.p_staff).status = "active";
+      body.p_roles.forEach((role, index) =>
+        grants.push({
+          id: "reactivated-" + index,
+          institution_id: inst,
+          staff_id: body.p_staff,
+          role,
+          active: true,
+          valid_from: "2020-01-01",
+          valid_until: null,
+          closed_at: null,
+          reason: body.p_reason,
+        }),
+      );
+      return json(null);
+    }
     if (rpc === "my_institution_verification_access") return json({ allowed: false });
     if (rpc === "my_policy_status")
       return json(
@@ -532,6 +595,96 @@ try {
   assert.equal(created.p_roles.length, 4);
   assert.equal(created.p_assignments.length, 1);
   assert.equal(created.p_assignments[0].subject_id, "subject-composition");
+  await navigate(client, "/staff");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Owner-only controls')",
+    "lifecycle owner controls",
+  );
+  await client.evaluate(
+    "Array.from(document.querySelectorAll('summary')).find(e=>e.textContent==='Owner-only controls').click()",
+  );
+  await fill(
+    client,
+    "input[aria-label='Lifecycle change reason']",
+    "Approved fixture ownership succession review.",
+  );
+  await choose("select[aria-label='Ownership successor']", "faculty-staff");
+  const transferDisabled = () =>
+    client.evaluate(
+      "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Confirm ownership transfer').disabled",
+    );
+  assert.equal(await transferDisabled(), true);
+  await fill(
+    client,
+    "input[aria-label='Ownership transfer confirmation']",
+    "TRANSFER wrong@staff-fixture.invalid",
+  );
+  assert.equal(await transferDisabled(), true);
+  await fill(
+    client,
+    "input[aria-label='Ownership transfer confirmation']",
+    "TRANSFER faculty@staff-fixture.invalid",
+  );
+  assert.equal(await transferDisabled(), false);
+  await click("Confirm ownership transfer");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Fixture owner changed')",
+    "stale ownership error",
+  );
+  const transferRequest = await client.evaluate(
+    "window.__staffRequests.find(r=>r.path.endsWith('/rpc/transfer_institution_ownership')).body",
+  );
+  assert.equal(transferRequest.p_successor, "faculty-staff");
+  assert.equal(transferRequest.p_expected_owner, "93000000-0000-4000-8000-000000000002");
+  await client.evaluate(
+    "Array.from(document.querySelectorAll('button')).find(b=>b.querySelector('strong')?.textContent==='Fixture Music Faculty').click()",
+  );
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Staff lifecycle & handover')",
+    "selected staff lifecycle",
+  );
+  await fill(
+    client,
+    "input[aria-label='Lifecycle change reason']",
+    "Reviewed fixture staff exit and duty closure.",
+  );
+  await client.evaluate(
+    "document.querySelector('input[aria-label=\"Confirm role closure\"]').click()",
+  );
+  assert.equal(
+    await client.evaluate(
+      "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Confirm staff state change').disabled",
+    ),
+    true,
+  );
+  await choose("select[aria-label='Lifecycle decision fixture-teaching']", "close");
+  await click("Confirm staff state change");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Explicit reactivation')",
+    "staff deactivation",
+  );
+  const lifecycleRequest = await client.evaluate(
+    "window.__staffRequests.find(r=>r.path.endsWith('/rpc/change_staff_lifecycle')).body",
+  );
+  assert.deepEqual(lifecycleRequest.p_decisions, [{ id: "fixture-teaching", action: "close" }]);
+  assert.equal(lifecycleRequest.p_status, "inactive");
+  assert.equal(lifecycleRequest.p_close_roles, true);
+  await click("Reactivate original staff identity");
+  await waitFor(
+    client,
+    "!document.body.innerText.includes('Explicit reactivation')",
+    "explicit staff reactivation",
+  );
+  assert.equal(
+    await client.evaluate(
+      "window.__staffRequests.some(r=>r.path.endsWith('/rpc/reactivate_staff'))",
+    ),
+    true,
+  );
   await setMode("faculty");
   await waitFor(
     client,
@@ -563,6 +716,50 @@ try {
       "faculty protected route",
     );
   }
+  await navigate(client, "/institution-verification");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Request ownership recovery')",
+    "staff authority request form",
+  );
+  await client.evaluate(
+    "Array.from(document.querySelectorAll('summary')).find(e=>e.textContent.includes('Request ownership recovery')).click()",
+  );
+  await fill(client, "input[aria-label='Successor phone']", "+919000000004");
+  await fill(client, "input[aria-label='New leadership designation']", "Registrar");
+  await fill(client, "input[aria-label='Authorization signatory name']", "Governing Officer");
+  await fill(client, "input[aria-label='Authorization signatory designation']", "Secretary");
+  await fill(
+    client,
+    "input[aria-label='Authorization date']",
+    new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+  );
+  await fill(
+    client,
+    "input[aria-label='Successor authority statement']",
+    "Authority must be independently reviewed with the official institution.",
+  );
+  await client.evaluate(
+    "(()=>{const input=Array.from(document.querySelectorAll('label')).find(e=>e.textContent.startsWith('Why recovery or replacement is required')).querySelector('input');const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;set.call(input,'The previous leader is unavailable; request manual authority review.');input.dispatchEvent(new Event('input',{bubbles:true}));})()",
+  );
+  await click("Save authority review draft");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Fixture authority review is already pending')",
+    "honest recovery status",
+  );
+  const recoveryRequest = await client.evaluate(
+    "window.__staffRequests.find(r=>r.path.endsWith('/rpc/start_staff_authority_review')).body",
+  );
+  assert.equal(recoveryRequest.p_capability, "institution_owner");
+  assert.equal(recoveryRequest.p_purpose, "ownership_recovery");
+  assert.equal(recoveryRequest.p_details.institution_name, "Fictional Browser Institution");
+  await navigate(client, "/");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Your staff profile')",
+    "return to staff workspace",
+  );
   await client.evaluate("localStorage.setItem('__phase2a_browser_invited','1')");
   await navigate(client, "/accept-invite?staff_invitation=" + "a".repeat(64));
   await waitFor(
@@ -594,7 +791,7 @@ try {
     true,
   );
   console.log(
-    "Phase 2A browser checks passed: owner dashboard/profile identity lock; department/program pages; six-step staff wizard; multi-role subject assignment; honest generated-link status; scoped faculty dashboard; seven protected URLs; token-based invitation acceptance. All responses were isolated browser fixtures.",
+    "Phase 2A/2B browser checks passed: owner dashboard/profile identity lock; department/program pages; six-step staff wizard; multi-role subject assignment; honest generated-link status; typed ownership confirmation and stale-owner response; mandatory duty decisions; deactivation/reactivation; scoped faculty dashboard; seven protected URLs; token-based invitation acceptance. All responses were isolated browser fixtures.",
   );
 } catch (error) {
   console.error(
