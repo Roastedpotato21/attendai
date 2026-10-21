@@ -236,6 +236,13 @@ async function main() {
 
   console.log("5. Verifying reviewed institution onboarding...");
   await require("./verify-institution-workflow.cjs")(client);
+  await require("./verify-period-concurrency.cjs")(client, {
+    host: "127.0.0.1",
+    port,
+    user: "postgres",
+    password: "password",
+    database: "postgres",
+  });
 
   console.log("6. Running Phase 2 test suite...");
   // Legacy database fixtures create additional Auth identities. Treat those

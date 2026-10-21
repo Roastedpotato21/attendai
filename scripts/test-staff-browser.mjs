@@ -414,6 +414,17 @@ function installStaffFixture() {
         single_hod: false,
         legacy_duties: [],
       });
+    if (rpc === "period_timetable_catalog")
+      return json({
+        today: "2026-10-21",
+        timezone: "Asia/Kolkata",
+        sections: [],
+        subjects: [],
+        faculty: [],
+        rules: [],
+        exceptions: [],
+      });
+    if (rpc === "period_session_directory") return json([]);
     if (rpc === "staff_authority_status") return json([]);
     if (rpc === "start_staff_authority_review")
       return json(

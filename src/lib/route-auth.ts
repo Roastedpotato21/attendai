@@ -39,6 +39,8 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   "/": { allowedRoles: ["admin", "faculty", "staff"] },
   "/student-dashboard": { allowedRoles: ["admin", "faculty", "staff"] },
   "/attendance": { allowedRoles: ["admin", "faculty"] },
+  "/period-attendance": { allowedRoles: ["admin", "faculty", "staff"] },
+  "/timetable": { allowedRoles: ["admin", "faculty", "staff"] },
   "/students": { allowedRoles: ["admin", "faculty", "staff"] },
   "/student-import": { allowedRoles: ["admin"] },
   "/cohorts": { allowedRoles: ["admin"] },

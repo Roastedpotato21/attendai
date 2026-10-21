@@ -117,6 +117,11 @@ relationships, scoped contact privacy, reviewed guardian imports and compatibili
 eligibility gates. Apply before deploying the app and reload the PostgREST schema
 cache. See [guardian mapping operations](../docs/guardian-mapping-phase3b.md).
 
+Problem #4 Phase 4A migrations `00044`–`00046` add timetable-driven period
+sessions, merged-section rosters, strict faculty/substitute authority, timed
+locking and Class Incharge corrections. They create no notification jobs.
+See [period attendance operations](../docs/timetable-attendance-phase4a.md).
+
 `tests/fixtures.sql` contains two institutions with deliberately overlapping class,
 admission, and employee identifiers. `tests/database/phase_2_tenant_isolation.sql`
 exercises cross-tenant RLS and relationship attacks transactionally.

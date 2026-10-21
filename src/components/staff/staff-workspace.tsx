@@ -5,6 +5,7 @@ import { staffWorkspace, setupMemberships } from "@/lib/services/staff-setup";
 import { roleLabels, type StaffWorkspace } from "@/lib/staff-setup";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PeriodSummary } from "@/components/attendance/period-summary";
 export function StaffWorkspacePage() {
   const { user } = useAuth();
   const [workspace, setWorkspace] = useState<StaffWorkspace | null>(null);
@@ -82,6 +83,7 @@ export function StaffWorkspacePage() {
           </label>
         )}
       </header>
+      <PeriodSummary institution={workspace.institution.institution_id} />
       <Card>
         <CardHeader>
           <CardTitle>Your staff profile</CardTitle>

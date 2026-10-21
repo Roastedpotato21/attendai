@@ -210,6 +210,8 @@ export function staffRouteAllowed(
     path === "/staff-profile" ||
     path === "/students" ||
     path === "/student-promotion" ||
+    path === "/period-attendance" ||
+    path === "/timetable" ||
     (canManage && setupPaths.includes(path as (typeof setupPaths)[number]))
   );
 }

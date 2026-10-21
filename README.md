@@ -39,6 +39,10 @@ Guardian identities, dated student relationships, private contact management,
 import integration and separate notification preferences/consent are documented in
 [`docs/guardian-mapping-phase3b.md`](docs/guardian-mapping-phase3b.md).
 
+Institution timetables, period sessions, merged rosters, substitution and scoped
+attendance corrections are documented in
+[`docs/timetable-attendance-phase4a.md`](docs/timetable-attendance-phase4a.md).
+
 ## Built with
 
 - TanStack Start

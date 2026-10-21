@@ -884,6 +884,21 @@ module.exports = async function verifyStudentAcademics(db, { owner, other, insti
       day,
       studentRow: row,
     });
+    await require("./verify-period-attendance.cjs")(db, {
+      owner,
+      other,
+      institution,
+      staff,
+      facultyUser,
+      dep,
+      program,
+      t1,
+      section: a,
+      sectionB: b,
+      cohort,
+      students: [rosterStudent, ids[1]],
+      day,
+    });
   } finally {
     await db.query("ROLLBACK TO SAVEPOINT phase3a");
     await db.query("RELEASE SAVEPOINT phase3a");

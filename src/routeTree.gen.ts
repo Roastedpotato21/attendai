@@ -30,6 +30,7 @@ import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as InterventionsRouteImport } from './routes/interventions'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
+import { Route as PeriodAttendanceRouteImport } from './routes/period-attendance'
 import { Route as PolicyConsentRouteImport } from './routes/policy-consent'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProgramsRouteImport } from './routes/programs'
@@ -45,6 +46,7 @@ import { Route as StudentPromotionRouteImport } from './routes/student-promotion
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as TimetableRouteImport } from './routes/timetable'
 import { Route as VoiceCallsRouteImport } from './routes/voice-calls'
 
 const IndexRoute = IndexRouteImport.update({
@@ -152,6 +154,11 @@ const MessagesRoute = MessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PeriodAttendanceRoute = PeriodAttendanceRouteImport.update({
+  id: '/period-attendance',
+  path: '/period-attendance',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PolicyConsentRoute = PolicyConsentRouteImport.update({
   id: '/policy-consent',
   path: '/policy-consent',
@@ -227,6 +234,11 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TimetableRoute = TimetableRouteImport.update({
+  id: '/timetable',
+  path: '/timetable',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VoiceCallsRoute = VoiceCallsRouteImport.update({
   id: '/voice-calls',
   path: '/voice-calls',
@@ -255,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
+  '/period-attendance': typeof PeriodAttendanceRoute
   '/policy-consent': typeof PolicyConsentRoute
   '/privacy': typeof PrivacyRoute
   '/programs': typeof ProgramsRoute
@@ -270,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
+  '/timetable': typeof TimetableRoute
   '/voice-calls': typeof VoiceCallsRoute
 }
 export interface FileRoutesByTo {
@@ -294,6 +308,7 @@ export interface FileRoutesByTo {
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
+  '/period-attendance': typeof PeriodAttendanceRoute
   '/policy-consent': typeof PolicyConsentRoute
   '/privacy': typeof PrivacyRoute
   '/programs': typeof ProgramsRoute
@@ -309,6 +324,7 @@ export interface FileRoutesByTo {
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
+  '/timetable': typeof TimetableRoute
   '/voice-calls': typeof VoiceCallsRoute
 }
 export interface FileRoutesById {
@@ -334,6 +350,7 @@ export interface FileRoutesById {
   '/interventions': typeof InterventionsRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
+  '/period-attendance': typeof PeriodAttendanceRoute
   '/policy-consent': typeof PolicyConsentRoute
   '/privacy': typeof PrivacyRoute
   '/programs': typeof ProgramsRoute
@@ -349,6 +366,7 @@ export interface FileRoutesById {
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
+  '/timetable': typeof TimetableRoute
   '/voice-calls': typeof VoiceCallsRoute
 }
 export interface FileRouteTypes {
@@ -375,6 +393,7 @@ export interface FileRouteTypes {
     | '/interventions'
     | '/login'
     | '/messages'
+    | '/period-attendance'
     | '/policy-consent'
     | '/privacy'
     | '/programs'
@@ -390,6 +409,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/templates'
     | '/terms'
+    | '/timetable'
     | '/voice-calls'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -414,6 +434,7 @@ export interface FileRouteTypes {
     | '/interventions'
     | '/login'
     | '/messages'
+    | '/period-attendance'
     | '/policy-consent'
     | '/privacy'
     | '/programs'
@@ -429,6 +450,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/templates'
     | '/terms'
+    | '/timetable'
     | '/voice-calls'
   id:
     | '__root__'
@@ -453,6 +475,7 @@ export interface FileRouteTypes {
     | '/interventions'
     | '/login'
     | '/messages'
+    | '/period-attendance'
     | '/policy-consent'
     | '/privacy'
     | '/programs'
@@ -468,6 +491,7 @@ export interface FileRouteTypes {
     | '/students'
     | '/templates'
     | '/terms'
+    | '/timetable'
     | '/voice-calls'
   fileRoutesById: FileRoutesById
 }
@@ -493,6 +517,7 @@ export interface RootRouteChildren {
   InterventionsRoute: typeof InterventionsRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
+  PeriodAttendanceRoute: typeof PeriodAttendanceRoute
   PolicyConsentRoute: typeof PolicyConsentRoute
   PrivacyRoute: typeof PrivacyRoute
   ProgramsRoute: typeof ProgramsRoute
@@ -508,6 +533,7 @@ export interface RootRouteChildren {
   StudentsRoute: typeof StudentsRoute
   TemplatesRoute: typeof TemplatesRoute
   TermsRoute: typeof TermsRoute
+  TimetableRoute: typeof TimetableRoute
   VoiceCallsRoute: typeof VoiceCallsRoute
 }
 
@@ -660,6 +686,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/period-attendance': {
+      id: '/period-attendance'
+      path: '/period-attendance'
+      fullPath: '/period-attendance'
+      preLoaderRoute: typeof PeriodAttendanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/policy-consent': {
       id: '/policy-consent'
       path: '/policy-consent'
@@ -765,6 +798,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/timetable': {
+      id: '/timetable'
+      path: '/timetable'
+      fullPath: '/timetable'
+      preLoaderRoute: typeof TimetableRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/voice-calls': {
       id: '/voice-calls'
       path: '/voice-calls'
@@ -797,6 +837,7 @@ const rootRouteChildren: RootRouteChildren = {
   InterventionsRoute: InterventionsRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
+  PeriodAttendanceRoute: PeriodAttendanceRoute,
   PolicyConsentRoute: PolicyConsentRoute,
   PrivacyRoute: PrivacyRoute,
   ProgramsRoute: ProgramsRoute,
@@ -812,6 +853,7 @@ const rootRouteChildren: RootRouteChildren = {
   StudentsRoute: StudentsRoute,
   TemplatesRoute: TemplatesRoute,
   TermsRoute: TermsRoute,
+  TimetableRoute: TimetableRoute,
   VoiceCallsRoute: VoiceCallsRoute,
 }
 export const routeTree = rootRouteImport
