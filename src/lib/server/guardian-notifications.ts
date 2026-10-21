@@ -145,7 +145,7 @@ export async function handleGuardianNotificationAdmin(request: Request): Promise
           .eq("institution_id", context.institutionId)
           .limit(5000),
         database
-          .from("student_parents")
+          .from("guardian_current_relationships")
           .select("parent_id,receives_notifications,students!inner(name,enrollment_status)")
           .eq("institution_id", context.institutionId)
           .limit(5000),
@@ -223,7 +223,7 @@ export async function handleGuardianNotificationAdmin(request: Request): Promise
     if (guardianError || !guardian || !guardian.active)
       return json({ error: "Guardian unavailable" }, 404);
     const { count: linkedCount, error: linkedError } = await database
-      .from("student_parents")
+      .from("guardian_current_relationships")
       .select("student_id,students!inner(id)", { head: true, count: "exact" })
       .eq("institution_id", context.institutionId)
       .eq("parent_id", guardian.id)
@@ -305,7 +305,7 @@ export async function handleGuardianNotificationDevice(request: Request): Promis
             .eq("institution_id", data.institution_id)
             .maybeSingle(),
           database
-            .from("student_parents")
+            .from("guardian_current_relationships")
             .select("student_id,students!inner(name,enrollment_status,institution_id)")
             .eq("institution_id", data.institution_id)
             .eq("parent_id", data.guardian_id)
@@ -457,7 +457,7 @@ export async function handleGuardianNotificationDevice(request: Request): Promis
             .eq("institution_id", device.institution_id)
             .maybeSingle(),
           database
-            .from("student_parents")
+            .from("guardian_current_relationships")
             .select("receives_notifications")
             .eq("parent_id", device.guardian_id)
             .eq("student_id", communication.student_id)

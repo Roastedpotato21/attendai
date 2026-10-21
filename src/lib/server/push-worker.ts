@@ -81,7 +81,7 @@ function supabaseStore(): PushWorkerStore {
         { data: institution, error: institutionError },
       ] = await Promise.all([
         db
-          .from("student_parents")
+          .from("guardian_current_relationships")
           .select("receives_notifications")
           .eq("institution_id", job.institution_id)
           .eq("student_id", communication["student_id"])

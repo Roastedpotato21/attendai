@@ -161,7 +161,7 @@ function supabaseStore(trialJobId?: string): CommunicationWorkerStore {
       const { data, error } = await db
         .from("communications")
         .select(
-          "id, institution_id, student_id, parent_id, type, metadata, students!inner(name, institution_id, enrollment_status), parents!inner(name, phone, language, preferred_channel, communication_consent, active, institution_id)",
+          "id, institution_id, student_id, parent_id, type, metadata, guardian_contact_version, students!inner(name, institution_id, enrollment_status), parents!inner(name, phone, language, preferred_channel, communication_consent, active, institution_id, contact_version)",
         )
         .eq("id", job.communication_id)
         .eq("institution_id", job.institution_id)
@@ -180,7 +180,7 @@ function supabaseStore(trialJobId?: string): CommunicationWorkerStore {
       )
         return null;
       const { data: relationship, error: relationshipError } = await db
-        .from("student_parents")
+        .from("guardian_current_relationships")
         .select("receives_notifications")
         .eq("student_id", communication["student_id"])
         .eq("parent_id", communication["parent_id"])
@@ -189,6 +189,8 @@ function supabaseStore(trialJobId?: string): CommunicationWorkerStore {
       if (relationshipError) throw new Error("Unable to verify guardian relationship");
       const guardianEligible =
         relationship?.receives_notifications === true &&
+        typeof communication["guardian_contact_version"] === "number" &&
+        communication["guardian_contact_version"] === parent["contact_version"] &&
         parent["preferred_channel"] === job.channel;
       let template: SmsTemplate | undefined;
       let institutionName: string | undefined;

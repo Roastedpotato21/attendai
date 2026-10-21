@@ -112,6 +112,11 @@ Review normalized institution-wide admission and roll duplicates before applying
 conflicts fail explicitly. See
 [student academic operations](../docs/student-academics-phase3a.md).
 
+Phase 3B migrations `00040`–`00043` retain guardian IDs while adding dated
+relationships, scoped contact privacy, reviewed guardian imports and compatibility
+eligibility gates. Apply before deploying the app and reload the PostgREST schema
+cache. See [guardian mapping operations](../docs/guardian-mapping-phase3b.md).
+
 `tests/fixtures.sql` contains two institutions with deliberately overlapping class,
 admission, and employee identifiers. `tests/database/phase_2_tenant_isolation.sql`
 exercises cross-tenant RLS and relationship attacks transactionally.

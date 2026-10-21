@@ -623,7 +623,9 @@ function AttendancePage() {
                         <p className="text-xs text-muted-foreground">{s.roll}</p>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        <p className="text-sm">{s.parentName}</p>
+                        <p className="text-sm">
+                          {s.parentName ?? "Guardian contact unavailable in this scope"}
+                        </p>
                         <p className="text-xs text-muted-foreground">
                           {s.parentPhone} · {s.language}
                         </p>

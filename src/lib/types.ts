@@ -26,9 +26,9 @@ export type Student = {
   roll: string;
   className: string;
   section: string;
-  parentName: string;
-  parentPhone: string;
-  language: Language;
+  parentName: string | null;
+  parentPhone: string | null;
+  language: Language | null;
   attendanceRate: number | null;
   consecutiveAbsences: number;
   status: StudentStatus;

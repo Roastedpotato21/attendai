@@ -46,9 +46,9 @@ export const studentService: StudentService = {
       roll: s.roll,
       className: s.class.name,
       section: s.class.section,
-      parentName: s.parent.name,
-      parentPhone: s.parent.phone,
-      language: s.parent.language,
+      parentName: s.parent?.name ?? null,
+      parentPhone: s.parent?.phone ?? null,
+      language: s.parent?.language ?? null,
       ...studentHistoryMetrics(s.id, sessions, records),
       status: statusByStudent.get(s.id) ?? "unmarked",
     }));

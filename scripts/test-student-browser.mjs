@@ -628,6 +628,7 @@ function installAcademicFixture() {
     cohort_name: "Recorded Music Cohort",
   };
   let batch = null;
+  const guardians = [];
   window.__academicStudentCount = () => students.length;
   function preview(rows) {
     return rows.map((data, i) => ({
@@ -680,10 +681,91 @@ function installAcademicFixture() {
       "stage_student_promotion",
       "commit_student_promotion",
       "change_student_academic_status",
+      "student_guardians",
+      "search_student_guardians",
+      "link_student_guardian",
+      "change_guardian_relationship",
+      "update_guardian_contact",
+      "record_guardian_communication_consent",
+      "stage_guardian_relationship_import",
+      "revise_guardian_relationship_import",
+      "commit_guardian_relationship_import",
     ];
     if (!known.includes(rpc) && !url.pathname.endsWith("/rest/v1/student_import_batches"))
       return previous(input, init);
     window.__studentRequests.push({ rpc, path: url.pathname, body });
+    if (rpc === "student_guardians")
+      return json({
+        can_manage: owner,
+        relationships: owner ? guardians.filter((g) => g.student_id === body.p_student) : [],
+      });
+    if (rpc === "search_student_guardians")
+      return json(
+        guardians
+          .map((g) => ({ ...g, id: g.guardian_id }))
+          .filter((g, i, all) => all.findIndex((x) => x.id === g.id) === i),
+      );
+    if (rpc === "link_student_guardian") {
+      const d = body.p_guardian;
+      const id = "guardian-link-" + guardians.length;
+      guardians.push({
+        ...body.p_relationship,
+        id,
+        student_id: body.p_student,
+        guardian_id: d.guardian_id || "guardian-" + id,
+        name: d.guardian_name,
+        phone: d.guardian_mobile,
+        email: d.guardian_email,
+        language: d.guardian_language,
+        guardian_active: true,
+        communication_consent: false,
+        contact_version: 0,
+        revision: 1,
+        status: "active",
+        registered_devices: 0,
+        preference_eligible: false,
+        can_edit_identity: true,
+        contact_metadata: {},
+        end_reason: null,
+      });
+      return json(id);
+    }
+    if (rpc === "change_guardian_relationship") {
+      const g = guardians.find((x) => x.id === body.p_relationship),
+        c = body.p_changes;
+      if (c.action === "primary") {
+        guardians
+          .filter((x) => x.student_id === g.student_id)
+          .forEach((x) => (x.is_primary = x.id === g.id));
+      }
+      if (c.action === "preference") g.receives_notifications = c.receives_notifications;
+      if (c.action === "end") {
+        g.status = "ended";
+        g.effective_until = c.effective_until;
+        g.end_reason = body.p_reason;
+      }
+      g.revision++;
+      return json(null);
+    }
+    if (rpc === "update_guardian_contact") {
+      guardians
+        .filter((x) => x.guardian_id === body.p_guardian)
+        .forEach((g) => {
+          Object.assign(g, body.p_details);
+          g.communication_consent = false;
+          g.contact_version++;
+        });
+      return json(null);
+    }
+    if (rpc === "record_guardian_communication_consent") {
+      guardians
+        .filter((x) => x.guardian_id === body.p_guardian)
+        .forEach((g) => {
+          g.communication_consent = body.p_accepted;
+          g.contact_version++;
+        });
+      return json(null);
+    }
     if (rpc === "student_academic_catalog") return json(catalog);
     if (rpc === "student_academic_directory") return json(owner ? students : []);
     if (rpc === "student_academic_profile") {
@@ -702,20 +784,29 @@ function installAcademicFixture() {
       catalog.cohorts.push({ ...body.p_details, id: "new-cohort" });
       return json("new-cohort");
     }
-    if (rpc === "stage_student_import") {
+    if (rpc === "stage_student_import" || rpc === "stage_guardian_relationship_import") {
       batch = {
         id: "import-batch",
         institution_id: inst,
         filename: body.p_filename,
-        kind: "import",
+        kind: rpc === "stage_student_import" ? "import" : "guardian_import",
         status: "preview",
         revision: 1,
         rows: body.p_rows,
-        preview: preview(body.p_rows),
+        preview:
+          rpc === "stage_student_import"
+            ? preview(body.p_rows)
+            : body.p_rows.map((data, i) => ({
+                row_number: i + 1,
+                data,
+                outcome: "valid",
+                errors: [],
+                warnings: ["Communication consent remains separate."],
+              })),
       };
       return json(batch);
     }
-    if (rpc === "revise_student_import") {
+    if (rpc === "revise_student_import" || rpc === "revise_guardian_relationship_import") {
       batch = {
         ...batch,
         rows: body.p_rows,
@@ -723,6 +814,16 @@ function installAcademicFixture() {
         revision: batch.revision + 1,
       };
       return json(batch);
+    }
+    if (rpc === "commit_guardian_relationship_import") {
+      batch.status = "committed";
+      return json(
+        body.p_selected.map((n) => ({
+          row_number: n,
+          student_id: "student-one",
+          relationship_id: "imported-link",
+        })),
+      );
     }
     if (rpc === "commit_student_import") {
       const results = body.p_selected.map((n) => ({ row_number: n, student_id: "imported-" + n }));
@@ -789,6 +890,122 @@ try {
       "document.body.innerText.includes('lateral')&&document.body.innerText.includes('Recorded Music Cohort')",
     ),
     true,
+  );
+  await fill(
+    client,
+    "input[aria-label='Academic change reason']",
+    "Guardian contacts and authorization independently reviewed.",
+  );
+  await waitFor(
+    client,
+    "document.body.innerText.includes('No guardian relationships recorded.')",
+    "guardian section",
+  );
+  await client.evaluate(
+    "[...document.querySelectorAll('summary')].find(x=>x.textContent==='Add Guardian').click()",
+  );
+  await fill(client, "input[aria-label='Guardian full name']", "Fixture Guardian Mother");
+  await fill(client, "input[aria-label='Guardian mobile (+country code)']", "+919876540001");
+  await fill(client, "input[aria-label='Guardian effective from']", "2026-07-01");
+  await choose("select[aria-label='Guardian relationship']", "mother");
+  await client.evaluate(
+    "[...document.querySelectorAll('label')].find(x=>x.textContent.includes('Primary notification recipient')).querySelector('input').click()",
+  );
+  await click("Confirm guardian link");
+  await waitFor(
+    client,
+    "document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('Fixture Guardian Mother')",
+    "new guardian link",
+  );
+  assert.equal(
+    await client.evaluate(
+      "document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('Communication consent: Not recorded')",
+    ),
+    true,
+  );
+  await click("Fixture Student Two");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Student profile — Fixture Student Two')&&document.body.innerText.includes('No guardian relationships recorded.')",
+    "second child guardian profile",
+  );
+  await client.evaluate(
+    "[...document.querySelectorAll('summary')].find(x=>x.textContent==='Add Guardian').click()",
+  );
+  await fill(client, "input[aria-label='Search existing guardian']", "Fixture Guardian");
+  await click("Find guardian candidates");
+  await waitFor(
+    client,
+    "[...document.querySelectorAll('button')].some(x=>x.textContent.includes('use reviewed identity'))",
+    "reviewed guardian search",
+  );
+  await client.evaluate(
+    "[...document.querySelectorAll('button')].find(x=>x.textContent.includes('use reviewed identity')).click()",
+  );
+  await fill(client, "input[aria-label='Guardian effective from']", "2026-07-01");
+  await click("Confirm guardian link");
+  await waitFor(
+    client,
+    "document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('Fixture Guardian Mother')",
+    "shared guardian reuse",
+  );
+  const reuse = await client.evaluate(
+    "window.__studentRequests.filter(r=>r.rpc==='link_student_guardian').at(-1).body",
+  );
+  assert.ok(reuse.p_guardian.guardian_id);
+  await click("Fixture Student One");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Student profile — Fixture Student One')&&Boolean(document.querySelector('input[aria-label=\"Edit guardian phone\"]'))",
+    "first child contacts",
+  );
+  await choose("select[aria-label='Recorded guardian communication consent']", "true");
+  await client.evaluate(
+    "[...document.querySelectorAll('summary')].find(x=>x.textContent==='Record separate communication consent / withdrawal').click()",
+  );
+  await fill(
+    client,
+    "input[aria-label='Communication consent evidence reference']",
+    "Recorded affirmative consent in isolated browser fixture.",
+  );
+  await click("Record communication consent decision");
+  await waitFor(
+    client,
+    "document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('Communication consent: Recorded')",
+    "separate communication consent",
+  );
+  await client.evaluate(
+    "[...document.querySelectorAll('summary')].find(x=>x.textContent==='Edit Guardian').click()",
+  );
+  await fill(client, "input[aria-label='Edit guardian phone']", "+919876540005");
+  await click("Save guardian contact");
+  await waitFor(
+    client,
+    "document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('+919876540005')&&document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('Communication consent: Not recorded')",
+    "phone change consent review",
+  );
+  await click("Allow notification preference");
+  await waitFor(
+    client,
+    "[...document.querySelectorAll('button')].some(x=>x.textContent==='Stop Notifications')",
+    "relationship notification preference",
+  );
+  await click("Stop Notifications");
+  await waitFor(
+    client,
+    "[...document.querySelectorAll('button')].some(x=>x.textContent==='Allow notification preference')",
+    "stop notification preference",
+  );
+  await fill(
+    client,
+    "input[aria-label='Relationship cutoff for Fixture Guardian Mother']",
+    "2026-10-20",
+  );
+  await click("End Relationship");
+  await waitFor(
+    client,
+    "document.querySelector('section[aria-label=\"Student guardians\"]').innerText.includes('ended')",
+    "retained ended relationship",
   );
   await fill(
     client,
@@ -941,6 +1158,33 @@ try {
   );
   assert.deepEqual(imported.p_selected, [1]);
   assert.equal(imported.p_revision, 2);
+  await choose("select[aria-label='Import type']", "guardians");
+  const beforeGuardianImport = await client.evaluate("window.__academicStudentCount()");
+  const guardianCsv =
+    "admission_number,guardian_name,guardian_relationship,guardian_mobile,guardian_effective_from,guardian_receives_notifications\nEXIST-001,Imported Fixture Guardian,guardian,+919876540011,2026-07-01,true";
+  await client.evaluate(
+    "(()=>{const d=new DataTransfer();d.items.add(new File([" +
+      JSON.stringify(guardianCsv) +
+      "],'guardians.csv',{type:'text/csv'}));const el=document.querySelector('input[aria-label=\"Student import file\"]');el.files=d.files;el.dispatchEvent(new Event('change',{bubbles:true}));})()",
+  );
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Valid rows: 1')&&document.body.innerText.includes('Import preview — guardians.csv')",
+    "guardian-only import preview",
+  );
+  assert.equal(await client.evaluate("window.__academicStudentCount()"), beforeGuardianImport);
+  await fill(client, "input[aria-label='Import confirmation']", "IMPORT 1");
+  await click("Commit 1 selected valid rows");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Imported 1 guardian relationships.')",
+    "guardian-only import result",
+  );
+  assert.equal(
+    await client.evaluate("window.__academicStudentCount()"),
+    beforeGuardianImport,
+    "Guardian import never creates another student identity",
+  );
   await navigate(client, "/student-promotion");
   await waitFor(
     client,
@@ -987,7 +1231,7 @@ try {
   await navigate(client, "/student-import");
   await waitForPath(client, "/");
   console.log(
-    "Phase 3A browser checks passed: canonical profile/history, graduation preservation, cohort creation, CSV upload and preview without inserts, existing-match resolution, correction/revision, typed import confirmation, promotion exceptions and unrelated faculty scope. All data is isolated browser fixtures.",
+    "Phase 3A/3B browser checks passed: student profile/history, guardian add and sibling reuse, separate consent, phone change review, preferences and retained ended links; student/guardian import previews and typed commits; cohort creation, graduation, promotion exceptions and unrelated faculty scope. All data is isolated browser fixtures.",
   );
 } catch (error) {
   console.error(

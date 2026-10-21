@@ -12,7 +12,7 @@
     "test:sms": "node --experimental-strip-types --test scripts/test-fast2sms.mjs",
     "test:auth-errors": "node --experimental-strip-types --test scripts/test-auth-errors.mjs",
     "test:auth-browser": "node scripts/test-auth-browser.mjs",
-    "test:guardian-browser": "node scripts/test-guardian-browser.mjs",
+    "test:guardian-browser": "node --experimental-strip-types scripts/test-guardian-browser.mjs",
     "test:attendance-browser": "node --env-file-if-exists=.env scripts/test-attendance-browser.mjs",
     "test:attendance-supabase": "node --env-file-if-exists=.env scripts/verify-attendance-supabase.mjs",
     "test:postgres": "node --experimental-strip-types scripts/verify-postgres.cjs",

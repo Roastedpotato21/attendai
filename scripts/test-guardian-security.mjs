@@ -44,7 +44,7 @@ async function withDatabase(overrides, run) {
     communication_dispatches: { id: "dispatch", status: "provider_accepted" },
     communications: { student_id: studentId, metadata: { attendance_session_id: eventId } },
     parents: { active: true, communication_consent: true },
-    student_parents: { receives_notifications: true },
+    guardian_current_relationships: { receives_notifications: true },
     institutions: { status: "active" },
     students: { enrollment_status: "active" },
     attendance_records: { status: "absent" },
@@ -66,7 +66,7 @@ async function withDatabase(overrides, run) {
       return Response.json(eventId);
     }
     assert.ok(Object.hasOwn(rows, table), `Unexpected database request: ${table}`);
-    if (table === "student_parents") {
+    if (table === "guardian_current_relationships") {
       assert.equal(url.searchParams.get("institution_id"), "eq.tenant");
       assert.equal(url.searchParams.get("parent_id"), "eq.guardian");
       if (url.searchParams.has("student_id"))
@@ -115,7 +115,7 @@ test("valid one-time invitation reveals only its institution and linked students
     {
       guardian_notification_invitations: { institution_id: "tenant", guardian_id: "guardian" },
       institutions: { name: "ABC School", status: "active" },
-      student_parents: {
+      guardian_current_relationships: {
         student_id: studentId,
         receives_notifications: true,
         students: { name: "Student One", institution_id: "tenant", enrollment_status: "active" },
@@ -295,8 +295,8 @@ test("a legacy device without explicit guardian consent cannot read attendance",
 
 test("old dispatch grants no attendance access after relationship or consent changes", async () => {
   for (const override of [
-    { student_parents: null },
-    { student_parents: { receives_notifications: false } },
+    { guardian_current_relationships: null },
+    { guardian_current_relationships: { receives_notifications: false } },
     { parents: { active: true, communication_consent: false } },
     { parents: { active: false, communication_consent: true } },
     { institutions: { status: "suspended" } },

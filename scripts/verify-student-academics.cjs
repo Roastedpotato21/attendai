@@ -870,6 +870,20 @@ module.exports = async function verifyStudentAcademics(db, { owner, other, insti
     console.log(
       `  PASS Phase 3A: canonical IDs, preview/correction, duplicate and existing resolution, normal/lateral/transfer entry, cohorts, promotion/exceptions, moves, history/status, audit and tenant/scoped security (${deniedCount} denied paths).`,
     );
+    await require("./verify-guardian-mapping.cjs")(db, {
+      owner,
+      other,
+      institution,
+      students: [rosterStudent, ids[1], ids[2]],
+      staff,
+      facultyUser,
+      dep,
+      program,
+      t1,
+      section: a,
+      day,
+      studentRow: row,
+    });
   } finally {
     await db.query("ROLLBACK TO SAVEPOINT phase3a");
     await db.query("RELEASE SAVEPOINT phase3a");

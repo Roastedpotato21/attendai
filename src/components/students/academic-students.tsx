@@ -25,8 +25,10 @@ import {
   parseStudentFile,
   studentFileHash,
   studentImportColumns,
+  guardianRelationshipColumns,
   type StudentImportRow,
 } from "@/lib/student-import";
+import { StudentGuardians } from "@/components/students/student-guardians";
 import type { Membership } from "@/lib/staff-setup";
 
 type PageKind = "directory" | "import" | "cohorts" | "promotion";
@@ -622,6 +624,12 @@ function StudentProfile(props: Props & { studentId: string; onChanged: () => Pro
           ))}
         </ul>
         {!profile.history.length && <p>No academic placement history has been recorded.</p>}
+        <StudentGuardians
+          studentId={s.id}
+          reason={props.reason}
+          busy={props.busy}
+          act={props.act}
+        />
       </CardContent>
     </Card>
   );
@@ -712,10 +720,12 @@ function PreviewSummary({ batch }: { batch: StudentBatch }) {
 function ImportRowEditor({
   row,
   busy,
+  guardianOnly = false,
   onSave,
 }: {
   row: ImportPreviewRow;
   busy: boolean;
+  guardianOnly?: boolean;
   onSave: (data: StudentImportRow) => void;
 }) {
   const [draft, setDraft] = useState<StudentImportRow>({ ...row.data });
@@ -750,7 +760,7 @@ function ImportRowEditor({
         </p>
       )}
       <div className="grid gap-2 md:grid-cols-3">
-        {studentImportColumns.map((k) => (
+        {(guardianOnly ? guardianRelationshipColumns : studentImportColumns).map((k) => (
           <label key={k}>
             {k.replaceAll("_", " ")}
             <Input
@@ -768,11 +778,32 @@ function ImportRowEditor({
           value={String(draft.action ?? "create")}
           onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))}
         >
-          <option value="create">Create new canonical identity</option>
+          <option value="create">
+            {guardianOnly
+              ? "Link reviewed guardian to existing student"
+              : "Create new canonical identity"}
+          </option>
           <option value="skip">Skip this row</option>
-          <option value="enroll_existing">Enroll reviewed existing identity</option>
+          {!guardianOnly && (
+            <option value="enroll_existing">Enroll reviewed existing identity</option>
+          )}
         </select>
       </label>
+      {!!row.guardian?.matches?.length && (
+        <div>
+          <p>
+            Guardian candidates: confirm exact name/mobile before setting guardian_id. No automatic
+            merge.
+          </p>
+          <ul>
+            {row.guardian.matches.map((g) => (
+              <li key={g.id}>
+                {g.name} · {g.phone} · ID {g.id}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {draft.action === "enroll_existing" && (
         <label>
           Existing identity
@@ -809,6 +840,7 @@ function ImportRowEditor({
   );
 }
 function StudentImport(props: Props) {
+  const [guardianOnly, setGuardianOnly] = useState(false);
   const [batch, setBatch] = useState<StudentBatch | null>(null),
     [selected, setSelected] = useState<number[]>([]),
     [confirmation, setConfirmation] = useState(""),
@@ -821,7 +853,7 @@ function StudentImport(props: Props) {
       .from("student_import_batches")
       .select("id,filename,status")
       .eq("institution_id", props.institution)
-      .eq("kind", "import")
+      .in("kind", ["import", "guardian_import"])
       .order("created_at", { ascending: false })
       .limit(20)
       .then(({ data, error }) => {
@@ -833,12 +865,32 @@ function StudentImport(props: Props) {
   }, [props.institution, props.catalog]);
   function accept(b: StudentBatch) {
     setBatch(b);
+    setGuardianOnly(b.kind === "guardian_import");
     setSelected(b.preview.filter((r) => r.outcome === "valid").map((r) => r.row_number));
     setConfirmation("");
     setResult(Array.isArray(b.result) ? b.result : null);
   }
   return (
     <div className="space-y-4">
+      <label>
+        Import type
+        <select
+          className={selectClass}
+          aria-label="Import type"
+          value={guardianOnly ? "guardians" : "students"}
+          disabled={props.busy}
+          onChange={(e) => {
+            setGuardianOnly(e.target.value === "guardians");
+            setBatch(null);
+            setResult(null);
+            setSelected([]);
+            setConfirmation("");
+          }}
+        >
+          <option value="students">Students with optional guardian</option>
+          <option value="guardians">Guardian relationships for existing students</option>
+        </select>
+      </label>
       <p>
         Upload → local parsing → database validation and preview → corrections → explicit
         confirmation. Only selected valid rows are committed.
@@ -851,11 +903,19 @@ function StudentImport(props: Props) {
         variant="outline"
         onClick={() => {
           const u = URL.createObjectURL(
-            new Blob([studentImportColumns.join(",") + "\n"], { type: "text/csv" }),
+            new Blob(
+              [
+                (guardianOnly ? guardianRelationshipColumns : studentImportColumns).join(",") +
+                  "\n",
+              ],
+              { type: "text/csv" },
+            ),
           );
           const a = document.createElement("a");
           a.href = u;
-          a.download = "student-import-template.csv";
+          a.download = guardianOnly
+            ? "guardian-relationships-template.csv"
+            : "student-import-template.csv";
           a.click();
           setTimeout(() => URL.revokeObjectURL(u), 1000);
         }}
@@ -902,15 +962,18 @@ function StudentImport(props: Props) {
               void props.act(async () => {
                 if (file.size > 4 * 1024 * 1024) throw new Error("File exceeds 4 MiB.");
                 const bytes = new Uint8Array(await file.arrayBuffer());
-                const rows = await parseStudentFile(file.name, bytes);
+                const rows = await parseStudentFile(file.name, bytes, guardianOnly);
                 accept(
-                  await academicRpc<StudentBatch>("stage_student_import", {
-                    p_institution: props.institution,
-                    p_filename: file.name,
-                    p_sha256: await studentFileHash(bytes),
-                    p_rows: rows,
-                    p_reason: props.reason,
-                  }),
+                  await academicRpc<StudentBatch>(
+                    guardianOnly ? "stage_guardian_relationship_import" : "stage_student_import",
+                    {
+                      p_institution: props.institution,
+                      p_filename: file.name,
+                      p_sha256: await studentFileHash(bytes),
+                      p_rows: rows,
+                      p_reason: props.reason,
+                    },
+                  ),
                 );
               });
           }}
@@ -974,18 +1037,24 @@ function StudentImport(props: Props) {
                   <ImportRowEditor
                     key={`${r.row_number}-${batch.revision}`}
                     row={r}
+                    guardianOnly={batch.kind === "guardian_import"}
                     busy={props.busy || props.reason.trim().length < 10}
                     onSave={(row) =>
                       void props.act(async () => {
                         const rows = [...batch.rows];
                         rows[r.row_number - 1] = row;
                         accept(
-                          await academicRpc<StudentBatch>("revise_student_import", {
-                            p_batch: batch.id,
-                            p_revision: batch.revision,
-                            p_rows: rows,
-                            p_reason: props.reason,
-                          }),
+                          await academicRpc<StudentBatch>(
+                            batch.kind === "guardian_import"
+                              ? "revise_guardian_relationship_import"
+                              : "revise_student_import",
+                            {
+                              p_batch: batch.id,
+                              p_revision: batch.revision,
+                              p_rows: rows,
+                              p_reason: props.reason,
+                            },
+                          ),
                         );
                       })
                     }
@@ -1017,13 +1086,18 @@ function StudentImport(props: Props) {
                   onClick={() =>
                     void props.act(async () => {
                       setResult(
-                        await academicRpc("commit_student_import", {
-                          p_batch: batch.id,
-                          p_revision: batch.revision,
-                          p_selected: selected,
-                          p_confirmation: confirmation,
-                          p_reason: props.reason,
-                        }),
+                        await academicRpc(
+                          batch.kind === "guardian_import"
+                            ? "commit_guardian_relationship_import"
+                            : "commit_student_import",
+                          {
+                            p_batch: batch.id,
+                            p_revision: batch.revision,
+                            p_selected: selected,
+                            p_confirmation: confirmation,
+                            p_reason: props.reason,
+                          },
+                        ),
                       );
                       setBatch({ ...batch, status: "committed" });
                     })
@@ -1035,7 +1109,12 @@ function StudentImport(props: Props) {
             )}
             {result && (
               <div role="status">
-                <p>Imported {result.length} reviewed identities/placements.</p>
+                <p>
+                  Imported {result.length}{" "}
+                  {batch.kind === "guardian_import"
+                    ? "guardian relationships."
+                    : "reviewed identities/placements."}
+                </p>
                 <ul>
                   {result.map((r) => (
                     <li key={r.row_number}>

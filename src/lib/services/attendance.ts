@@ -65,9 +65,9 @@ export const attendanceService: AttendanceService = {
         roll: s.roll,
         className: s.class.fullName,
         section: s.class.section,
-        parentName: s.parent.name,
-        parentPhone: s.parent.phone,
-        language: s.parent.language,
+        parentName: s.parent?.name ?? null,
+        parentPhone: s.parent?.phone ?? null,
+        language: s.parent?.language ?? null,
         ...studentHistoryMetrics(s.id, allSessions, history),
         status: records.find((record) => record.studentId === s.id)?.status ?? "unmarked",
       })),
@@ -135,7 +135,8 @@ export const attendanceService: AttendanceService = {
     const students = await studentRepository.findAll();
     const counts = new Map<string, number>();
     for (const student of students)
-      counts.set(student.parent.language, (counts.get(student.parent.language) ?? 0) + 1);
+      if (student.parent)
+        counts.set(student.parent.language, (counts.get(student.parent.language) ?? 0) + 1);
     return Array.from(counts, ([name, value]) => ({ name, value }));
   },
 

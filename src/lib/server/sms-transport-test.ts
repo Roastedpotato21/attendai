@@ -64,7 +64,7 @@ export async function handleSmsTransportTest(request: Request): Promise<Response
     : null;
   const links = guardian
     ? await db
-        .from("student_parents")
+        .from("guardian_current_relationships")
         .select("receives_notifications,students!inner(id,enrollment_status,institution_id)")
         .eq("parent_id", guardian.id)
         .eq("institution_id", guardian.institution_id)

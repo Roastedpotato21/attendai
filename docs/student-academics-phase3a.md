@@ -5,6 +5,10 @@ not been performed. All synthetic records stay in disposable database or local
 browser fixtures. No production students, guardians, attendance or messages were
 created by these tests.
 
+Phase 3B extends imports and Student Profile with optional reviewed guardian
+records. See [guardian mapping](guardian-mapping-phase3b.md) for that separate
+extension and its migrations.
+
 ## Identity and academic structure
 
 The existing `students` row is the canonical identity within an institution.
@@ -137,7 +141,7 @@ prevent a stale roster projection. Reactivation clears the previous projection
 until a new placement is explicitly assigned. Academic-only imports support
 future placements because they have no legacy roster projection to schedule.
 
-New imports have no fabricated guardian, legacy class or daily attendance status.
+Academic imports have no fabricated guardian, legacy class or daily attendance status.
 They are omitted from the legacy guardian/attendance repository serialization
 until an explicitly designed later integration exists. Phase 3A does not change
 attendance submission, session handling, guardian mapping, notification delivery,
@@ -238,5 +242,5 @@ With a local built preview and isolated hidden headless Chrome profile:
     npm run test:auth-browser -- http://127.0.0.1:4191 9227
 
 Production migration/deployment access and review of legacy identifiers/data
-remain rollout prerequisites. No Phase 3B or attendance/guardian workflow is
-included.
+remain rollout prerequisites. Phase 3B guardian workflows are documented separately;
+attendance workflows are outside Phase 3A.

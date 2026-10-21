@@ -5,7 +5,7 @@ import { fromSupabaseError } from "../errors";
 
 export type PopulatedStudent = DbStudent & {
   class: DbClass;
-  parent: DbParent;
+  parent: DbParent | null;
 };
 
 type SupabaseStudentRow = {
@@ -40,7 +40,7 @@ type SupabaseStudentRow = {
     preferred_channel: DbParent["preferredChannel"];
     created_at: string;
     updated_at: string;
-  };
+  } | null;
 };
 
 // Helper to map Supabase joined row to PopulatedStudent
@@ -67,17 +67,19 @@ const mapSupabaseStudent = (row: SupabaseStudentRow): PopulatedStudent => {
       createdAt: row.classes.created_at,
       updatedAt: row.classes.updated_at,
     },
-    parent: {
-      id: row.parents.id,
-      institutionId: row.parents.institution_id,
-      userId: row.parents.user_id,
-      name: row.parents.name,
-      phone: row.parents.phone,
-      language: row.parents.language,
-      preferredChannel: row.parents.preferred_channel,
-      createdAt: row.parents.created_at,
-      updatedAt: row.parents.updated_at,
-    },
+    parent: row.parents
+      ? {
+          id: row.parents.id,
+          institutionId: row.parents.institution_id,
+          userId: row.parents.user_id,
+          name: row.parents.name,
+          phone: row.parents.phone,
+          language: row.parents.language,
+          preferredChannel: row.parents.preferred_channel,
+          createdAt: row.parents.created_at,
+          updatedAt: row.parents.updated_at,
+        }
+      : null,
   };
 };
 

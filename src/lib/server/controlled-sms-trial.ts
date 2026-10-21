@@ -35,7 +35,7 @@ export async function handleControlledSmsTrial(request: Request): Promise<Respon
       .single(),
     db.from("institutions").select("name,status").eq("id", trial.institution_id).single(),
     db
-      .from("student_parents")
+      .from("guardian_current_relationships")
       .select("receives_notifications")
       .eq("parent_id", trial.parent_id)
       .eq("student_id", trial.student_id)

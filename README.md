@@ -35,6 +35,10 @@ Student CSV/Excel import, cohorts, placement history, promotion and academic
 status changes are documented in
 [`docs/student-academics-phase3a.md`](docs/student-academics-phase3a.md).
 
+Guardian identities, dated student relationships, private contact management,
+import integration and separate notification preferences/consent are documented in
+[`docs/guardian-mapping-phase3b.md`](docs/guardian-mapping-phase3b.md).
+
 ## Built with
 
 - TanStack Start

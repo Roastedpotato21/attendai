@@ -3,11 +3,13 @@ import { test } from "node:test";
 import { zipSync, strToU8 } from "fflate";
 import {
   parseStudentFile,
-  studentImportColumns,
+  studentImportColumns as allStudentImportColumns,
+  guardianRelationshipColumns,
   inspectStudentWorkbook,
   studentFileHash,
 } from "../src/lib/student-import.ts";
 import { importSummary } from "../src/lib/student-academics.ts";
+const studentImportColumns = allStudentImportColumns.filter((c) => !c.startsWith("guardian_"));
 
 const details = {
   full_name: "Student, With Unicode É",
@@ -43,11 +45,8 @@ const xml = (v) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
 // Actual OOXML ZIP fixtures; the application parser does not generate workbooks.
-export function workbook(rows = [details], extra = {}) {
-  const matrix = [
-    studentImportColumns,
-    ...rows.map((r) => studentImportColumns.map((k) => r[k] ?? "")),
-  ];
+export function workbook(rows = [details], extra = {}, columns = studentImportColumns) {
+  const matrix = [columns, ...rows.map((r) => columns.map((k) => r[k] ?? ""))];
   const files = {
     "[Content_Types].xml":
       '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
@@ -67,7 +66,14 @@ export function workbook(rows = [details], extra = {}) {
             '">' +
             r
               .map((v, j) => {
-                const ref = String.fromCharCode(65 + j) + (i + 1);
+                let column = "",
+                  position = j + 1;
+                while (position) {
+                  position--;
+                  column = String.fromCharCode(65 + (position % 26)) + column;
+                  position = Math.floor(position / 26);
+                }
+                const ref = column + (i + 1);
                 return typeof v === "number"
                   ? `<c r="${ref}"><v>${v}</v></c>`
                   : `<c r="${ref}" t="inlineStr"><is><t>${xml(v)}</t></is></c>`;
@@ -101,6 +107,89 @@ test("Excel numeric identifiers fail explicitly rather than losing their leading
     parseStudentFile("admissions.xlsx", workbook([{ ...details, admission_number: 123 }])),
     /Text/,
   );
+});
+
+test("student CSV and Excel accept optional guardian contacts without treating an international mobile as a formula", async () => {
+  const guardian = {
+    ...details,
+    guardian_name: "Recorded Guardian",
+    guardian_relationship: "mother",
+    guardian_mobile: "+91 98765 40001",
+    guardian_receives_notifications: "true",
+    guardian_is_primary: "false",
+    guardian_effective_from: "2026-07-01",
+  };
+  const data =
+    allStudentImportColumns.join(",") +
+    "\n" +
+    allStudentImportColumns.map((k) => escapeCsv(guardian[k] ?? "")).join(",");
+  for (const rows of [
+    await parseStudentFile("students.csv", strToU8(data)),
+    await parseStudentFile("students.xlsx", workbook([guardian], {}, allStudentImportColumns)),
+  ]) {
+    assert.equal(rows[0].guardian_mobile, "+91 98765 40001");
+    assert.equal(rows[0].guardian_is_primary, "false");
+    assert.equal(rows[0].guardian_receives_notifications, "true");
+    assert.equal(rows[0].communication_consent, undefined);
+  }
+});
+test("guardian-only CSV and Excel use existing admission identity and preserve text contact identifiers", async () => {
+  const guardian = {
+    admission_number: "0000123",
+    guardian_name: "Recorded Guardian",
+    guardian_relationship: "guardian",
+    guardian_mobile: "+919876540001",
+    guardian_effective_from: "2026-07-01",
+  };
+  const data =
+    guardianRelationshipColumns.join(",") +
+    "\n" +
+    guardianRelationshipColumns.map((k) => escapeCsv(guardian[k] ?? "")).join(",");
+  for (const rows of [
+    await parseStudentFile("guardians.csv", strToU8(data), true),
+    await parseStudentFile(
+      "guardians.xlsx",
+      workbook([guardian], {}, guardianRelationshipColumns),
+      true,
+    ),
+  ]) {
+    assert.equal(rows[0].admission_number, "0000123");
+    assert.equal(rows[0].guardian_mobile, "+919876540001");
+    assert.equal(rows[0].full_name, undefined);
+  }
+  await assert.rejects(parseStudentFile("guardians.csv", strToU8(data)), /template/);
+  await assert.rejects(
+    parseStudentFile(
+      "guardians.xlsx",
+      workbook([{ ...guardian, guardian_mobile: 919876540001 }], {}, guardianRelationshipColumns),
+      true,
+    ),
+    /Text/,
+  );
+});
+test("guardian phone exception never permits formula text or arbitrary consent columns", async () => {
+  for (const [field, bad] of [
+    ["guardian_mobile", '=HYPERLINK("https://fixture.invalid")'],
+    ["guardian_name", "+Formula"],
+  ]) {
+    const guardian = {
+      ...details,
+      guardian_name: "Guardian",
+      guardian_mobile: "+919876540001",
+      [field]: bad,
+    };
+    const data =
+      allStudentImportColumns.join(",") +
+      "\n" +
+      allStudentImportColumns.map((k) => escapeCsv(guardian[k] ?? "")).join(",");
+    await assert.rejects(parseStudentFile("guardians.csv", strToU8(data)), /formulas/);
+  }
+  const data =
+    studentImportColumns.join(",") +
+    ",communication_consent\n" +
+    studentImportColumns.map((k) => escapeCsv(details[k] ?? "")).join(",") +
+    ",true";
+  await assert.rejects(parseStudentFile("students.csv", strToU8(data)), /template/);
 });
 test("normal, lateral and transfer entries retain the supplied actual entry point", async () => {
   for (const entry_type of ["normal", "lateral", "transfer"]) {

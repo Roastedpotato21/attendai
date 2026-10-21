@@ -81,12 +81,17 @@ export type ImportPreviewRow = {
   outcome: "valid" | "rejected" | "skipped";
   existing_students?: { id: string; name: string; admission_number: string; roll_number: string }[];
   potential_duplicates?: { id: string; name: string; admission_number: string }[];
+  guardian?: {
+    matches: { id: string; name: string; phone: string; contact_version: number }[];
+    contact_version: number | null;
+    errors: string[];
+  };
 };
 export type StudentBatch = {
   result?: { student_id: string; row_number: number }[] | { changed: number } | null;
   id: string;
   institution_id: string;
-  kind: "import" | "promotion";
+  kind: "import" | "promotion" | "guardian_import";
   filename: string;
   revision: number;
   status: "preview" | "committed";
