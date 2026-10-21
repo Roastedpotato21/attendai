@@ -4,8 +4,12 @@ import { useAuth } from "@/components/auth/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { acceptPolicies, currentPolicies, type CurrentPolicy } from "@/lib/policy-acceptance";
+import { AuthPage, authPageHead } from "@/components/auth/auth-page";
 
-export const Route = createFileRoute("/policy-consent")({ component: PolicyConsent });
+export const Route = createFileRoute("/policy-consent")({
+  component: PolicyConsent,
+  head: () => authPageHead("Review policies", "Review the current AttendAI policies to continue."),
+});
 
 function PolicyConsent() {
   const { user, logout } = useAuth();
@@ -24,10 +28,10 @@ function PolicyConsent() {
   }, [user]);
   if (!user) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <AuthPage>
+        <Card className="aw-auth-card">
           <CardHeader>
-            <CardTitle>Sign in to review policies</CardTitle>
+            <h1 id="auth-title">Sign in to review policies</h1>
           </CardHeader>
           <CardContent>
             <Link to="/login" search={{ redirect: undefined }} className="text-primary underline">
@@ -35,7 +39,7 @@ function PolicyConsent() {
             </Link>
           </CardContent>
         </Card>
-      </main>
+      </AuthPage>
     );
   }
   const submit = async () => {
@@ -51,10 +55,10 @@ function PolicyConsent() {
     }
   };
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/20 p-4">
-      <Card className="w-full max-w-lg">
+    <AuthPage>
+      <Card className="aw-auth-card">
         <CardHeader>
-          <CardTitle>Review AttendAI policies</CardTitle>
+          <h1 id="auth-title">Review AttendAI policies</h1>
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="text-sm text-muted-foreground">
@@ -114,6 +118,6 @@ function PolicyConsent() {
           </Button>
         </CardContent>
       </Card>
-    </main>
+    </AuthPage>
   );
 }

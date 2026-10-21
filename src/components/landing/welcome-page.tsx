@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 
 import { ArrowDown, ArrowUpRight, Check, ChevronDown, Menu, X } from "lucide-react";
 import { GlyphPortal } from "./glyph-portal";
 import { AttendanceDevice, CircuitBoard } from "./fintech-visuals";
+import { AnimatedGuide } from "./animated-guide";
 
 const navigation = [
   ["Product", "product"],
@@ -549,20 +550,22 @@ function Guides() {
       </div>
       <div className="aw-faq">
         {guides.map((guide, index) => (
-          <details key={guide.question}>
-            <summary>
-              <span className="aw-mono">0{index + 1}</span>
-              {guide.question}
-              <ChevronDown size={18} aria-hidden="true" />
-            </summary>
-            <div>
-              <p>{guide.answer}</p>
-              <a className="aw-text-link" href={guide.href}>
-                {guide.label}
-                <ArrowUpRight size={15} />
-              </a>
-            </div>
-          </details>
+          <AnimatedGuide
+            key={guide.question}
+            question={
+              <>
+                <span className="aw-mono">0{index + 1}</span>
+                {guide.question}
+                <ChevronDown size={18} aria-hidden="true" />
+              </>
+            }
+          >
+            <p>{guide.answer}</p>
+            <a className="aw-text-link" href={guide.href}>
+              {guide.label}
+              <ArrowUpRight size={15} />
+            </a>
+          </AnimatedGuide>
         ))}
       </div>
     </section>

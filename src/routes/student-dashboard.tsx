@@ -111,7 +111,7 @@ function StudentDashboard() {
         <StatCard
           label="Classes Present"
           value={data.presentCount.toString()}
-          icon={<UserCheck className="h-4 w-4 text-emerald-500" />}
+          icon={<UserCheck className="h-4 w-4 text-success" />}
         />
         <StatCard
           label="Classes Absent"

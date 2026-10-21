@@ -177,7 +177,7 @@ export function AttendanceDevice() {
         <path
           d="m131 187 29-68 29 68m-46-23h34"
           fill="none"
-          stroke="#29372b"
+          stroke="#373029"
           strokeOpacity=".65"
           strokeWidth="7"
           strokeLinecap="round"

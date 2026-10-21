@@ -1,5 +1,16 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { CircuitBoard } from "@/components/landing/fintech-visuals";
+import { authPageHead } from "@/components/auth/auth-page";
+import policyCss from "./policy-page.css?url";
+
+export function policyPageHead(title: string) {
+  const head = authPageHead(
+    title,
+    "AttendAI policies for institution accounts, attendance records and guardian communication.",
+  );
+  return { ...head, links: [...head.links, { rel: "stylesheet", href: policyCss }] };
+}
 
 export function PolicyLayout({
   title,
@@ -10,31 +21,80 @@ export function PolicyLayout({
   version: string;
   children: ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const media = matchMedia("(prefers-reduced-motion: reduce)");
+    let observer: IntersectionObserver | undefined;
+    function setup() {
+      observer?.disconnect();
+      root!.classList.toggle("aw-policy-motion", !media.matches);
+      if (media.matches) return;
+      observer = new IntersectionObserver(
+        (entries) =>
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("aw-policy-visible");
+              observer?.unobserve(entry.target);
+            }
+          }),
+        { threshold: 0.05 },
+      );
+      root!
+        .querySelectorAll(".aw-policy-body > section")
+        .forEach((section) => observer!.observe(section));
+    }
+    setup();
+    media.addEventListener("change", setup);
+    return () => {
+      observer?.disconnect();
+      media.removeEventListener("change", setup);
+    };
+  }, []);
   return (
-    <main className="min-h-screen bg-muted/20 px-4 py-10 text-foreground">
-      <article className="mx-auto max-w-3xl rounded-xl border bg-background p-6 shadow-sm sm:p-10">
-        <Link
-          to="/login"
-          search={{ redirect: undefined }}
-          className="text-sm font-semibold text-primary"
-        >
-          AttendAI
+    <div className="attend-landing aw-policy" ref={ref}>
+      <a className="aw-skip" href="#policy-content">
+        Skip to policy
+      </a>
+      <header className="aw-auth-header">
+        <Link to="/" className="aw-wordmark">
+          <span className="aw-auth-mark" aria-hidden="true">
+            A
+          </span>
+          AttendAI<span>.</span>
         </Link>
-        <h1 className="mt-5 font-display text-3xl font-bold">{title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Version {version} · Effective 15 October 2026
-        </p>
-        <p className="mt-3 rounded-md border bg-muted/40 p-3 text-sm">
-          Product draft pending final institutional and legal review.
-        </p>
-        <div className="mt-8 space-y-7 leading-7 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-semibold [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-6">
-          {children}
+        <nav aria-label="Account navigation">
+          <Link to="/">Back to home</Link>
+          <a className="aw-button aw-button-green" href="/login">
+            Sign In ↗
+          </a>
+        </nav>
+      </header>
+      <main id="policy-content" tabIndex={-1}>
+        <div className="aw-policy-hero">
+          <CircuitBoard dark />
+          <div>
+            <p className="aw-kicker">TRUST, IN THE DETAILS</p>
+            <h1>
+              <span>{title}</span>
+            </h1>
+            <p className="aw-policy-version">Version {version} · Effective 15 October 2026</p>
+          </div>
+          <p className="aw-policy-draft">
+            Product draft pending final institutional and legal review.
+          </p>
         </div>
-        <nav className="mt-10 flex gap-5 border-t pt-5 text-sm text-primary">
+        <article className="aw-policy-body">{children}</article>
+      </main>
+      <footer className="aw-policy-footer">
+        <span>A more considered institution day.</span>
+        <nav aria-label="Policy navigation">
           <Link to="/privacy">Privacy Policy</Link>
           <Link to="/terms">Terms & Conditions</Link>
+          <Link to="/">Home</Link>
         </nav>
-      </article>
-    </main>
+      </footer>
+    </div>
   );
 }

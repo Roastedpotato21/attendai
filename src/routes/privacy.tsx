@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PolicyLayout } from "@/components/policy/policy-layout";
+import { PolicyLayout, policyPageHead } from "@/components/policy/policy-layout";
 import { POLICY_CONTACT_MESSAGE, POLICY_VERSION } from "@/lib/policies";
 
 export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
-  head: () => ({ meta: [{ title: "Privacy Policy — AttendAI" }] }),
+  head: () => policyPageHead("Privacy Policy"),
 });
 
 function PrivacyPage() {

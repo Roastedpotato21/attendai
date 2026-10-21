@@ -2,13 +2,29 @@
 
 The public opening and landing page live at `/`; `/welcome` remains an alias.
 The existing protected dashboard now lives at `/dashboard`. Sign-in and institution
-registration use the same forest palette, local fonts and circuit artwork as the
+registration use the same brown/cool-cream palette, local fonts and circuit artwork as the
 landing page, with responsive account layouts and links back home. Sign In opens
 `/login`; Get Started opens `/create-account`, where existing users can also sign
 in. Verified staff enter `/dashboard` after login, invitation acceptance, policy
 acceptance or approved verification. Pending applicants retain the institution
 verification gate. Sidebar links and denied-route fallbacks use `/dashboard`.
 No API, database, migration, provider or delivery behavior changes in this pass.
+
+The current site-wide palette uses cool light cream `#e5e4df`, surface `#efeee9`,
+brown `#68442e` and dark brown `#211710`. It replaces both the original forest
+landing colors and the older blue application theme, including dark mode, charts,
+sidebar, account forms and favicon. Inter Tight is now the shared local app font;
+the remote Sora/Manrope stylesheet is removed. Plus Jakarta remains the portal
+font. The historical reference palette documented below describes the inspected
+source, not the current site colors.
+
+Docs disclosures keep native details/summary keyboard behavior and animate
+measured height in both directions, including interrupted/reversed toggles. Reduced
+motion switches immediately. Privacy and Terms share the new typography, circuit
+hero and restrained title/section entrances; the legal text/version is unchanged.
+The policy acceptance form also uses the account theme, with existing consent and
+authorization logic retained. Legal text remains server-rendered and readable
+without JavaScript, in reduced motion and in print.
 
 ## References and reuse
 

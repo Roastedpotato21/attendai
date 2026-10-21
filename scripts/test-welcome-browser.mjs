@@ -232,6 +232,20 @@ try {
   await client.evaluate(`document.querySelector('#docs summary').focus()`);
   await key("Enter");
   await until(`document.querySelector('#docs details').open`, "guide opened by keyboard");
+  await sleep(450);
+  const expandedHeight = await client.evaluate(
+    `document.querySelector('#docs details').getBoundingClientRect().height`,
+  );
+  await key("Enter");
+  await sleep(80);
+  const closing = await client.evaluate(
+    `({height:document.querySelector('#docs details').getBoundingClientRect().height,open:document.querySelector('#docs details').open,animated:document.querySelector('#docs details').getAnimations().length>0})`,
+  );
+  assert.ok(
+    closing.animated && closing.open && closing.height < expandedHeight,
+    "Docs closes with a visible height animation",
+  );
+  await until(`!document.querySelector('#docs details').open`, "guide closed after animation");
   assert.equal(
     await client.evaluate(`document.querySelectorAll('.aw-footer nav').length > 0`),
     true,
@@ -377,7 +391,7 @@ try {
         await client.evaluate(
           `getComputedStyle(document.querySelector('.aw-auth')).getPropertyValue('--primary').trim()`,
         ),
-        "#2f5640",
+        "#68442e",
       );
       const screenshot = await client.call("Page.captureScreenshot", { format: "png" });
       await writeFile(
@@ -395,12 +409,75 @@ try {
   }
   for (const path of ["/privacy", "/terms"]) {
     await navigate(path);
+    await until(`!!document.querySelector('.aw-policy')`, "themed policy page");
     assert.ok(await client.evaluate(`document.body.innerText.length > 100`));
+    assert.ok(
+      await client.evaluate(
+        `getComputedStyle(document.querySelector('h1')).fontFamily.includes('Attend Sans')`,
+      ),
+    );
+    assert.equal(
+      await client.evaluate(
+        `getComputedStyle(document.querySelector('.aw-policy h1 > span')).animationName`,
+      ),
+      "none",
+      "Reduced motion policy title",
+    );
+    assert.equal(
+      await client.evaluate(
+        `getComputedStyle(document.querySelector('.aw-policy')).backgroundColor`,
+      ),
+      "rgb(229, 228, 223)",
+      "Cool light cream",
+    );
+    for (const width of [390, 1440]) {
+      await client.call("Emulation.setDeviceMetricsOverride", {
+        width,
+        height: 1000,
+        deviceScaleFactor: 1,
+        mobile: width < 600,
+      });
+      await client.evaluate("scrollTo(0,0)");
+      await sleep(200);
+      assert.ok(
+        await client.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`),
+        "Policy fits viewport",
+      );
+      const screenshot = await client.call("Page.captureScreenshot", { format: "png" });
+      await writeFile(
+        `.tmp/entry-screenshots/${path.slice(1)}-${width}.png`,
+        Buffer.from(screenshot.data, "base64"),
+      );
+    }
   }
+  await navigate("/policy-consent");
+  await until(`!!document.querySelector('.aw-auth')`, "themed policy acceptance");
+  await client.evaluate(`document.documentElement.classList.add('dark')`);
+  assert.equal(
+    await client.evaluate(
+      `getComputedStyle(document.documentElement).getPropertyValue('--background').trim()`,
+    ),
+    "#211710",
+    "Application dark theme uses brown",
+  );
+  await client.evaluate(`document.documentElement.classList.remove('dark')`);
 
   await client.call("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
   });
+  await navigate("/privacy");
+  await until(`document.querySelector('.aw-policy-motion')`, "policy motion enabled");
+  assert.equal(
+    await client.evaluate(
+      `getComputedStyle(document.querySelector('.aw-policy h1 > span')).animationName`,
+    ),
+    "aw-policy-title",
+  );
+  await client.evaluate(`document.querySelector('.aw-policy-body section').scrollIntoView()`);
+  await until(
+    `document.querySelector('.aw-policy-body section').classList.contains('aw-policy-visible')`,
+    "policy section entrance",
+  );
   await welcome();
   await section("homepage");
   await sleep(1400);
