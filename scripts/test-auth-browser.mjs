@@ -424,6 +424,17 @@ try {
     "document.body.innerText.includes('Pending verification')",
     "pending status",
   );
+  await navigate(client, "/institution-verification/unknown-page");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('.not-found-page'))",
+    "pending applicant can read the public 404",
+  );
+  await sleep(300);
+  assert.equal(
+    await client.evaluate("location.pathname"),
+    "/institution-verification/unknown-page",
+  );
   for (const path of [
     "/dashboard",
     "/students",

@@ -462,6 +462,87 @@ try {
   );
   await client.evaluate(`document.documentElement.classList.remove('dark')`);
 
+  await mkdir(".tmp/not-found-screenshots", { recursive: true });
+  for (const path of ["/unknown-page", "/dashboard/unknown-page", "/privacy/unknown-page"]) {
+    const response = await fetch(new URL(path, base));
+    assert.equal(response.status, 404, "Missing URLs retain HTTP 404");
+    assert.ok((await response.text()).includes("not-found-page"), "404 renders without JavaScript");
+    await navigate(path);
+    await until(`document.querySelector('.not-found-page')`, "public themed 404");
+    await sleep(300);
+    assert.equal(
+      await client.evaluate("location.pathname"),
+      path,
+      "404 does not redirect to login",
+    );
+  }
+  assert.equal(
+    await client.evaluate("document.querySelectorAll('.nf-card-field .lucide-cloud').length"),
+    1,
+  );
+  assert.equal(
+    await client.evaluate("document.querySelectorAll('.nf-card-field .lucide-star').length"),
+    2,
+  );
+  assert.equal(await client.evaluate("document.title"), "Page not found — AttendAI");
+  assert.equal(
+    await client.evaluate("document.querySelector('meta[name=robots]').content"),
+    "noindex, follow",
+  );
+  assert.equal(
+    await client.evaluate(
+      "getComputedStyle(document.querySelector('.nf-card-position')).animationName",
+    ),
+    "none",
+    "404 honors reduced motion",
+  );
+  for (const width of [320, 390, 768, 1440]) {
+    await client.call("Emulation.setDeviceMetricsOverride", {
+      width,
+      height: 1000,
+      deviceScaleFactor: 1,
+      mobile: width < 600,
+    });
+    await sleep(200);
+    assert.ok(
+      await client.evaluate("document.documentElement.scrollWidth<=innerWidth+1"),
+      "404 fits viewport",
+    );
+    assert.ok(
+      await client.evaluate(
+        `[...document.querySelectorAll('.nf-card-field .lucide-cloud,.nf-card-field .lucide-star')].every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})`,
+      ),
+      "Cloud and both stars remain visible",
+    );
+    const screenshot = await client.call("Page.captureScreenshot", { format: "png" });
+    await writeFile(
+      `.tmp/not-found-screenshots/404-${width}.png`,
+      Buffer.from(screenshot.data, "base64"),
+    );
+  }
+  await client.evaluate("document.querySelector('.nf-home').click()");
+  await until("document.querySelector('.aw-portal')", "404 home action");
+  assert.equal(
+    await client.evaluate("Boolean(document.querySelector('meta[name=robots][content*=noindex]'))"),
+    false,
+    "404 metadata does not leak to home",
+  );
+  await client.evaluate("history.back()");
+  await until("document.querySelector('.not-found-page')", "404 on client-side back navigation");
+  await client.call("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+  });
+  assert.equal(
+    await client.evaluate(
+      "getComputedStyle(document.querySelector('.nf-card-position')).animationName",
+    ),
+    "nf-card-arrive",
+    "404 card entrance enabled",
+  );
+  console.log(
+    "PASS: SSR/HTTP 404, nested unknown URLs, public access, home/back navigation, cloud/two stars, responsive layout and reduced motion.",
+  );
+
   await client.call("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
   });

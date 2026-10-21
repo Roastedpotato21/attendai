@@ -549,6 +549,14 @@ try {
     source: "(" + installStaffFixture.toString() + ")();",
   });
   await setMode("owner");
+  await navigate(client, "/staff/unknown-page");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('.not-found-page'))",
+    "signed-in staff 404",
+  );
+  await sleep(300);
+  assert.equal(await client.evaluate("location.pathname"), "/staff/unknown-page");
   await navigate(client, "/");
   await waitFor(
     client,
