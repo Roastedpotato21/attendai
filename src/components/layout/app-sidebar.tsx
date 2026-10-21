@@ -55,7 +55,10 @@ const groups: NavGroup[] = [
       { title: "My Staff Profile", url: "/staff-profile", icon: Users },
       { title: "My Attendance", url: "/student-dashboard", icon: LayoutDashboard },
       { title: "Attendance", url: "/attendance", icon: CalendarCheck },
-      { title: "Students & Parents", url: "/students", icon: Users },
+      { title: "Students", url: "/students", icon: Users },
+      { title: "Student Import", url: "/student-import", icon: Users },
+      { title: "Batches / Cohorts", url: "/cohorts", icon: GraduationCap },
+      { title: "Promotion", url: "/student-promotion", icon: GraduationCap },
     ],
   },
   {

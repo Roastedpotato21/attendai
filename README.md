@@ -31,6 +31,10 @@ Ownership transfer, staff leave/deactivation, responsibility handover and review
 emergency succession are documented in
 [`docs/institution-setup-phase2b.md`](docs/institution-setup-phase2b.md).
 
+Student CSV/Excel import, cohorts, placement history, promotion and academic
+status changes are documented in
+[`docs/student-academics-phase3a.md`](docs/student-academics-phase3a.md).
+
 ## Built with
 
 - TanStack Start

@@ -15,6 +15,7 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as AuditLogsRouteImport } from './routes/audit-logs'
 import { Route as CheckInRouteImport } from './routes/check-in'
+import { Route as CohortsRouteImport } from './routes/cohorts'
 import { Route as CreateAccountRouteImport } from './routes/create-account'
 import { Route as DepartmentsRouteImport } from './routes/departments'
 import { Route as EscalationsRouteImport } from './routes/escalations'
@@ -39,6 +40,8 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as StaffAssignmentsRouteImport } from './routes/staff-assignments'
 import { Route as StaffProfileRouteImport } from './routes/staff-profile'
 import { Route as StudentDashboardRouteImport } from './routes/student-dashboard'
+import { Route as StudentImportRouteImport } from './routes/student-import'
+import { Route as StudentPromotionRouteImport } from './routes/student-promotion'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -72,6 +75,11 @@ const AuditLogsRoute = AuditLogsRouteImport.update({
 const CheckInRoute = CheckInRouteImport.update({
   id: '/check-in',
   path: '/check-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CohortsRoute = CohortsRouteImport.update({
+  id: '/cohorts',
+  path: '/cohorts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateAccountRoute = CreateAccountRouteImport.update({
@@ -194,6 +202,16 @@ const StudentDashboardRoute = StudentDashboardRouteImport.update({
   path: '/student-dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StudentImportRoute = StudentImportRouteImport.update({
+  id: '/student-import',
+  path: '/student-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StudentPromotionRoute = StudentPromotionRouteImport.update({
+  id: '/student-promotion',
+  path: '/student-promotion',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentsRoute = StudentsRouteImport.update({
   id: '/students',
   path: '/students',
@@ -222,6 +240,7 @@ export interface FileRoutesByFullPath {
   '/attendance': typeof AttendanceRoute
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
+  '/cohorts': typeof CohortsRoute
   '/create-account': typeof CreateAccountRoute
   '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
@@ -246,6 +265,8 @@ export interface FileRoutesByFullPath {
   '/staff-assignments': typeof StaffAssignmentsRoute
   '/staff-profile': typeof StaffProfileRoute
   '/student-dashboard': typeof StudentDashboardRoute
+  '/student-import': typeof StudentImportRoute
+  '/student-promotion': typeof StudentPromotionRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
@@ -258,6 +279,7 @@ export interface FileRoutesByTo {
   '/attendance': typeof AttendanceRoute
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
+  '/cohorts': typeof CohortsRoute
   '/create-account': typeof CreateAccountRoute
   '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
@@ -282,6 +304,8 @@ export interface FileRoutesByTo {
   '/staff-assignments': typeof StaffAssignmentsRoute
   '/staff-profile': typeof StaffProfileRoute
   '/student-dashboard': typeof StudentDashboardRoute
+  '/student-import': typeof StudentImportRoute
+  '/student-promotion': typeof StudentPromotionRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
@@ -295,6 +319,7 @@ export interface FileRoutesById {
   '/attendance': typeof AttendanceRoute
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
+  '/cohorts': typeof CohortsRoute
   '/create-account': typeof CreateAccountRoute
   '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
@@ -319,6 +344,8 @@ export interface FileRoutesById {
   '/staff-assignments': typeof StaffAssignmentsRoute
   '/staff-profile': typeof StaffProfileRoute
   '/student-dashboard': typeof StudentDashboardRoute
+  '/student-import': typeof StudentImportRoute
+  '/student-promotion': typeof StudentPromotionRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
   '/terms': typeof TermsRoute
@@ -333,6 +360,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/audit-logs'
     | '/check-in'
+    | '/cohorts'
     | '/create-account'
     | '/departments'
     | '/escalations'
@@ -357,6 +385,8 @@ export interface FileRouteTypes {
     | '/staff-assignments'
     | '/staff-profile'
     | '/student-dashboard'
+    | '/student-import'
+    | '/student-promotion'
     | '/students'
     | '/templates'
     | '/terms'
@@ -369,6 +399,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/audit-logs'
     | '/check-in'
+    | '/cohorts'
     | '/create-account'
     | '/departments'
     | '/escalations'
@@ -393,6 +424,8 @@ export interface FileRouteTypes {
     | '/staff-assignments'
     | '/staff-profile'
     | '/student-dashboard'
+    | '/student-import'
+    | '/student-promotion'
     | '/students'
     | '/templates'
     | '/terms'
@@ -405,6 +438,7 @@ export interface FileRouteTypes {
     | '/attendance'
     | '/audit-logs'
     | '/check-in'
+    | '/cohorts'
     | '/create-account'
     | '/departments'
     | '/escalations'
@@ -429,6 +463,8 @@ export interface FileRouteTypes {
     | '/staff-assignments'
     | '/staff-profile'
     | '/student-dashboard'
+    | '/student-import'
+    | '/student-promotion'
     | '/students'
     | '/templates'
     | '/terms'
@@ -442,6 +478,7 @@ export interface RootRouteChildren {
   AttendanceRoute: typeof AttendanceRoute
   AuditLogsRoute: typeof AuditLogsRoute
   CheckInRoute: typeof CheckInRoute
+  CohortsRoute: typeof CohortsRoute
   CreateAccountRoute: typeof CreateAccountRoute
   DepartmentsRoute: typeof DepartmentsRoute
   EscalationsRoute: typeof EscalationsRoute
@@ -466,6 +503,8 @@ export interface RootRouteChildren {
   StaffAssignmentsRoute: typeof StaffAssignmentsRoute
   StaffProfileRoute: typeof StaffProfileRoute
   StudentDashboardRoute: typeof StudentDashboardRoute
+  StudentImportRoute: typeof StudentImportRoute
+  StudentPromotionRoute: typeof StudentPromotionRoute
   StudentsRoute: typeof StudentsRoute
   TemplatesRoute: typeof TemplatesRoute
   TermsRoute: typeof TermsRoute
@@ -514,6 +553,13 @@ declare module '@tanstack/react-router' {
       path: '/check-in'
       fullPath: '/check-in'
       preLoaderRoute: typeof CheckInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cohorts': {
+      id: '/cohorts'
+      path: '/cohorts'
+      fullPath: '/cohorts'
+      preLoaderRoute: typeof CohortsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create-account': {
@@ -684,6 +730,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/student-import': {
+      id: '/student-import'
+      path: '/student-import'
+      fullPath: '/student-import'
+      preLoaderRoute: typeof StudentImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/student-promotion': {
+      id: '/student-promotion'
+      path: '/student-promotion'
+      fullPath: '/student-promotion'
+      preLoaderRoute: typeof StudentPromotionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/students': {
       id: '/students'
       path: '/students'
@@ -722,6 +782,7 @@ const rootRouteChildren: RootRouteChildren = {
   AttendanceRoute: AttendanceRoute,
   AuditLogsRoute: AuditLogsRoute,
   CheckInRoute: CheckInRoute,
+  CohortsRoute: CohortsRoute,
   CreateAccountRoute: CreateAccountRoute,
   DepartmentsRoute: DepartmentsRoute,
   EscalationsRoute: EscalationsRoute,
@@ -746,6 +807,8 @@ const rootRouteChildren: RootRouteChildren = {
   StaffAssignmentsRoute: StaffAssignmentsRoute,
   StaffProfileRoute: StaffProfileRoute,
   StudentDashboardRoute: StudentDashboardRoute,
+  StudentImportRoute: StudentImportRoute,
+  StudentPromotionRoute: StudentPromotionRoute,
   StudentsRoute: StudentsRoute,
   TemplatesRoute: TemplatesRoute,
   TermsRoute: TermsRoute,

@@ -106,6 +106,12 @@ dated handover, access revocation and independently reviewed emergency successio
 Apply after Phase 2A and before the frontend. See
 [ownership and staff lifecycle operations](../docs/institution-setup-phase2b.md).
 
+Phase 3A migrations `00037`–`00039` add student cohorts, dated placements,
+validated CSV/Excel import batches, promotion and academic status lifecycle.
+Review normalized institution-wide admission and roll duplicates before applying;
+conflicts fail explicitly. See
+[student academic operations](../docs/student-academics-phase3a.md).
+
 `tests/fixtures.sql` contains two institutions with deliberately overlapping class,
 admission, and employee identifiers. `tests/database/phase_2_tenant_isolation.sql`
 exercises cross-tenant RLS and relationship attacks transactionally.

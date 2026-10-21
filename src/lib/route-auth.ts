@@ -40,6 +40,9 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   "/student-dashboard": { allowedRoles: ["admin", "faculty", "staff"] },
   "/attendance": { allowedRoles: ["admin", "faculty"] },
   "/students": { allowedRoles: ["admin", "faculty", "staff"] },
+  "/student-import": { allowedRoles: ["admin"] },
+  "/cohorts": { allowedRoles: ["admin"] },
+  "/student-promotion": { allowedRoles: ["admin", "faculty", "staff"] },
   "/guardian-devices": { allowedRoles: ["admin", "staff"] },
 
   // AI Communication

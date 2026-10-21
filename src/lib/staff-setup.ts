@@ -208,6 +208,8 @@ export function staffRouteAllowed(
   return (
     path === "/" ||
     path === "/staff-profile" ||
+    path === "/students" ||
+    path === "/student-promotion" ||
     (canManage && setupPaths.includes(path as (typeof setupPaths)[number]))
   );
 }

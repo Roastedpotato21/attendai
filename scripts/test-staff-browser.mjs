@@ -706,7 +706,6 @@ try {
     "/staff-assignments",
     "/institution-profile",
     "/attendance",
-    "/students",
   ]) {
     await navigate(client, path);
     await waitForPath(client, "/");
@@ -791,7 +790,7 @@ try {
     true,
   );
   console.log(
-    "Phase 2A/2B browser checks passed: owner dashboard/profile identity lock; department/program pages; six-step staff wizard; multi-role subject assignment; honest generated-link status; typed ownership confirmation and stale-owner response; mandatory duty decisions; deactivation/reactivation; scoped faculty dashboard; seven protected URLs; token-based invitation acceptance. All responses were isolated browser fixtures.",
+    "Phase 2A/2B browser checks passed: owner dashboard/profile identity lock; department/program pages; six-step staff wizard; multi-role subject assignment; honest generated-link status; typed ownership confirmation and stale-owner response; mandatory duty decisions; deactivation/reactivation; scoped faculty dashboard; protected URLs; token-based invitation acceptance. All responses were isolated browser fixtures.",
   );
 } catch (error) {
   console.error(

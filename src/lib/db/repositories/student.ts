@@ -89,6 +89,7 @@ export const studentRepository = {
           .from("students")
           .select("*, classes(*), parents(*)")
           .eq("class_id", classId)
+          .not("parent_id", "is", null)
           .eq("enrollment_status", "active")
           .order("roll")
           .order("id")
@@ -110,6 +111,8 @@ export const studentRepository = {
           parents (*)
         `,
           )
+          .not("class_id", "is", null)
+          .not("parent_id", "is", null)
           .order("id")
           .range(from, to),
       "student findAll",
@@ -130,6 +133,8 @@ export const studentRepository = {
         `,
       )
       .eq("id", id)
+      .not("class_id", "is", null)
+      .not("parent_id", "is", null)
       .maybeSingle();
 
     if (error) throw fromSupabaseError("student lookup", error);
