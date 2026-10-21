@@ -12,8 +12,12 @@ type Counts = { claimed: number; completed: number; retried: number; failed: num
 export async function processNotificationChannels(
   limit: number,
   sms: (limit: number) => Promise<Counts> = processCommunicationJobs,
-  push: (limit: number) => Promise<Counts> = async (size) =>
-    (await import("./push-worker.ts")).processPushJobs(size),
+  push: (limit: number) => Promise<Counts> = async (size) => {
+    // Keep the existing explicit live gate. Missing DB configuration fails this channel.
+    if (process.env["FCM_DELIVERY_MODE"] === "live")
+      await (await import("./period-notifications.ts")).processPeriodNotifications();
+    return (await import("./push-worker.ts")).processPushJobs(size);
+  },
 ): Promise<Counts> {
   const results = await Promise.allSettled([
     Promise.resolve().then(() => sms(limit)),

@@ -691,6 +691,20 @@ module.exports = async function verifyPeriodAttendance(db, ctx) {
         action,
       );
     assert.ok(events.every((e) => e.actor_profile_id && e.reason && e.created_at));
+    await require("./verify-period-notifications.cjs")(db, {
+      owner,
+      other,
+      institution,
+      day,
+      lab,
+      studentB,
+      ciA,
+      ciB,
+      facultyUser,
+      role,
+      detail,
+      correct,
+    });
     await role(owner);
     await db.query("SELECT public.set_staff_roles($1,ARRAY['hod'],$2)", [staff, reason]);
     await role(facultyUser);

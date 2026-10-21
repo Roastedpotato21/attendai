@@ -134,11 +134,12 @@ function GuardianNotifications() {
         void post("event-status", { communicationId })
           .then(async (response) => {
             if (!response.ok) throw new Error("Event status unavailable");
-            const result = (await response.json()) as { currentStatus?: string };
+            const result = (await response.json()) as { currentStatus?: string; message?: string };
             setMessage(
-              result.currentStatus === "absent"
-                ? (payload.notification?.body ?? "An attendance update is available.")
-                : "Attendance has changed. Check the current record with your institution.",
+              result.message ??
+                (result.currentStatus === "absent"
+                  ? (payload.notification?.body ?? "An attendance update is available.")
+                  : "Attendance has changed. Check the current record with your institution."),
             );
             void post("acknowledge", { communicationId });
           })
@@ -249,12 +250,16 @@ function GuardianNotifications() {
           void post("event-status", { communicationId: eventId })
             .then(async (eventResponse) => {
               if (!eventResponse.ok) throw new Error("Event status unavailable");
-              const result = (await eventResponse.json()) as { currentStatus?: string };
+              const result = (await eventResponse.json()) as {
+                currentStatus?: string;
+                message?: string;
+              };
               if (live)
                 setMessage(
-                  result.currentStatus === "absent"
-                    ? "The absence is still recorded. Contact the institution if this is incorrect."
-                    : "This attendance record has changed. Contact the institution for the current details.",
+                  result.message ??
+                    (result.currentStatus === "absent"
+                      ? "The absence is still recorded. Contact the institution if this is incorrect."
+                      : "This attendance record has changed. Contact the institution for the current details."),
                 );
             })
             .catch(() => {

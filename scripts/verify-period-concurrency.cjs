@@ -28,7 +28,7 @@ module.exports = async function verifyPeriodConcurrency(db, config) {
         uid + "@concurrency.fixture.invalid",
       ]);
     await db.query(
-      "INSERT INTO public.user_policy_acceptances(user_id,policy_version_id,acceptance_method) SELECT u.id,v.id,'access_gate' FROM auth.users u CROSS JOIN public.policy_versions v WHERE u.id=ANY($1::uuid[]) AND v.active",
+      "INSERT INTO public.user_policy_acceptances(user_id,policy_version_id,acceptance_method) SELECT u.id,v.id,'access_gate' FROM auth.users u CROSS JOIN public.policy_versions v WHERE u.id=ANY($1::uuid[]) AND v.active ON CONFLICT(user_id,policy_version_id) DO NOTHING",
       [[owner, faculty, ci, sub]],
     );
     await db.query(
@@ -239,6 +239,15 @@ module.exports = async function verifyPeriodConcurrency(db, config) {
     console.log(
       "  PASS Phase 4A concurrency: two real database connections produce one Final Submit; substitute/original authority race has one winner and no duplicate marks.",
     );
+    await require("./verify-period-notification-concurrency.cjs")(db, config, {
+      institution,
+      owner,
+      ci,
+      student,
+      session: first,
+      day: today,
+      role,
+    });
   } finally {
     await Promise.allSettled(connections.map((c) => c.end()));
     await role(null, true);

@@ -14,13 +14,14 @@ export type PushInput = {
   body: string;
   communicationId: string;
   idempotencyKey: string;
+  expiresAt?: string;
 };
 
 type ServiceAccount = { project_id: string; client_email: string; private_key: string };
 const projectId = "attendai-41f64";
-// Six hours fits the current attendance freshness rule. Operators may choose
+// Eight hours is the default for attendance notices. Operators may choose
 // one to 24 hours; invalid values fail closed before any provider request.
-const configuredAttendanceTtl = Number(process.env["ATTENDANCE_PUSH_TTL_SECONDS"] ?? 6 * 60 * 60);
+const configuredAttendanceTtl = Number(process.env["ATTENDANCE_PUSH_TTL_SECONDS"] ?? 8 * 60 * 60);
 if (
   !Number.isInteger(configuredAttendanceTtl) ||
   configuredAttendanceTtl < 3600 ||
@@ -171,17 +172,28 @@ export async function sendGuardianNotification(
   )
     return { ok: false, kind: "permanent", code: "invalid_payload" };
   try {
+    const remaining = input.expiresAt
+      ? Math.floor((Date.parse(input.expiresAt) - Date.now()) / 1000)
+      : ATTENDANCE_PUSH_TTL_SECONDS;
+    if (!Number.isFinite(remaining) || remaining <= 0)
+      return { ok: false, kind: "permanent", code: "notification_expired" };
     if (process.env["FIREBASE_PROJECT_ID"] !== projectId)
       throw new Error("FCM project is not verified");
     const link = new URL("/guardian-notifications", process.env["ATTENDAI_APP_URL"]);
     link.searchParams.set("event", input.communicationId);
     if (link.protocol !== "https:") throw new Error("HTTPS app URL is required");
+    const bearer = await accessToken();
+    const ttl = Math.min(
+      ATTENDANCE_PUSH_TTL_SECONDS,
+      input.expiresAt ? Math.floor((Date.parse(input.expiresAt) - Date.now()) / 1000) : remaining,
+    );
+    if (ttl <= 0) return { ok: false, kind: "permanent", code: "notification_expired" };
     const response = await fetch(
       `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
       {
         method: "POST",
         headers: {
-          authorization: `Bearer ${await accessToken()}`,
+          authorization: `Bearer ${bearer}`,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -192,7 +204,10 @@ export async function sendGuardianNotification(
             data: { communicationId: input.communicationId },
             webpush: {
               fcm_options: { link: link.toString() },
-              headers: { Urgency: "high", TTL: String(ATTENDANCE_PUSH_TTL_SECONDS) },
+              headers: {
+                Urgency: "high",
+                TTL: String(ttl),
+              },
               notification: {
                 tag: input.communicationId,
                 icon: new URL("/favicon.ico", link).toString(),

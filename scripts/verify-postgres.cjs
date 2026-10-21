@@ -236,13 +236,6 @@ async function main() {
 
   console.log("5. Verifying reviewed institution onboarding...");
   await require("./verify-institution-workflow.cjs")(client);
-  await require("./verify-period-concurrency.cjs")(client, {
-    host: "127.0.0.1",
-    port,
-    user: "postgres",
-    password: "password",
-    database: "postgres",
-  });
 
   console.log("6. Running Phase 2 test suite...");
   // Legacy database fixtures create additional Auth identities. Treat those
@@ -630,6 +623,15 @@ async function main() {
 
   console.log("11. Testing SMS integration with disposable attendance and simulated delivery...");
   await require("./verify-sms-flow.cjs")(client);
+  // Committed concurrency fixtures include enrolled devices. Run them after
+  // legacy transport fixtures that intentionally require an empty device table.
+  await require("./verify-period-concurrency.cjs")(client, {
+    host: "127.0.0.1",
+    port,
+    user: "postgres",
+    password: "password",
+    database: "postgres",
+  });
 
   console.log("Closing disposable database connection...");
   await client.end();

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { academicRpc } from "@/lib/services/student-academics";
 import { setupMemberships } from "@/lib/services/staff-setup";
 import type { Membership } from "@/lib/staff-setup";
+import { PeriodNotificationSettings, PeriodNotificationStatus } from "./period-notifications-panel";
 import {
   completePeriodMarks,
   periodCounts,
@@ -139,10 +140,12 @@ export function PeriodWorkspace({ page }: { page: "sessions" | "timetable" }) {
       </label>
       <p>
         No unsubmitted session creates absences. Raw marks are retained without an attendance
-        percentage policy. This phase sends no guardian notifications.
+        percentage policy. Guardian notices require an eligible locked absence and current consented
+        delivery registration.
       </p>
       {catalog ? (
         <div key={institution}>
+          <PeriodNotificationSettings institution={institution} timezone={catalog.timezone} />
           {page === "sessions" ? (
             <SessionDirectory
               institution={institution}
@@ -447,6 +450,11 @@ function SessionEditor(props: Shared & { sessionId: string; onChanged: () => Pro
         Recorded Present: {counts.present} · Absent: {counts.absent} · Approved Leave:{" "}
         {counts.approvedLeave} · Unmarked: {counts.unmarked}
       </p>
+      <PeriodNotificationStatus
+        session={s.id}
+        revision={s.revision}
+        names={Object.fromEntries(detail.roster.map((r) => [r.student_id, r.name_snapshot]))}
+      />
       {s.state === "cancelled" ? (
         <p>Cancelled: {s.cancel_reason}. No attendance is expected.</p>
       ) : (

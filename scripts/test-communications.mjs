@@ -858,7 +858,21 @@ test("FCM validation-only request targets the enrolled FID with the exact alert"
       submitted.message.webpush.fcm_options.link,
       "https://attendai.example.invalid/guardian-notifications?event=10000000-0000-4000-8000-000000000001",
     );
-    assert.equal(submitted.message.webpush.headers.TTL, "21600");
+    assert.equal(submitted.message.webpush.headers.TTL, "28800");
+    const periodOutcome = await sendGuardianNotification(
+      {
+        installationId: "fid-guardian-trial-0001",
+        title: "Attendance Alert",
+        body: "Isolated period notification.",
+        communicationId: "10000000-0000-4000-8000-000000000001",
+        idempotencyKey: "isolated-period-ttl",
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      },
+      true,
+    );
+    assert.equal(periodOutcome.ok, true);
+    assert.ok(Number(submitted.message.webpush.headers.TTL) <= 3600);
+    assert.ok(Number(submitted.message.webpush.headers.TTL) >= 3590);
     assert.equal(
       submitted.message.webpush.notification.tag,
       "10000000-0000-4000-8000-000000000001",

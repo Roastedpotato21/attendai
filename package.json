@@ -22,6 +22,7 @@
     "test:students": "node --experimental-strip-types --test scripts/test-student-academics.mjs",
     "test:students-browser": "node scripts/test-student-browser.mjs",
     "test:periods": "node --experimental-strip-types --test scripts/test-period-attendance.mjs",
+    "test:period-notifications": "node --experimental-strip-types --test scripts/test-period-notifications.mjs",
     "test:periods-browser": "node scripts/test-period-browser.mjs",
     "verification:import": "node --experimental-strip-types --env-file-if-exists=.env scripts/import-institution-registry.mjs",
     "verification:prune": "node --env-file-if-exists=.env scripts/prune-verification-evidence.mjs",

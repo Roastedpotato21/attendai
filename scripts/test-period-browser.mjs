@@ -665,6 +665,9 @@ function installPeriodFixture() {
         "period_timetable_catalog",
         "period_session_directory",
         "period_session_detail",
+        "period_notification_status",
+        "period_notification_configuration",
+        "set_period_notification_settings",
         "create_timetable_rule",
         "retire_timetable_rule",
         "add_timetable_exception",
@@ -679,6 +682,34 @@ function installPeriodFixture() {
     )
       return previous(input, init);
     window.__periodRequests.push({ rpc, body });
+    if (rpc === "period_notification_configuration")
+      return json({
+        can_configure: actor === "owner",
+        enabled: false,
+        summary_local_time: "17:00:00",
+      });
+    if (rpc === "set_period_notification_settings") return json(null);
+    if (rpc === "period_notification_status")
+      return json([
+        {
+          student_id: "student-a",
+          event_id: "notification-fixture",
+          kind: "first_absence",
+          state: session.state === "corrected" ? "cancelled" : "provider_accepted",
+          created_at: "2026-10-21T03:40:00Z",
+        },
+        ...(actor === "ci"
+          ? []
+          : [
+              {
+                student_id: "student-b",
+                event_id: "south-notification",
+                kind: "daily_summary",
+                state: "unavailable",
+                created_at: "2026-10-21T03:40:00Z",
+              },
+            ]),
+      ]);
     if (rpc === "period_timetable_catalog") return json(catalog);
     if (rpc === "period_session_directory")
       return json(
@@ -825,6 +856,20 @@ try {
     "input[aria-label='Period operation reason']",
     "Institution timetable reviewed with actual subject faculty assignments.",
   );
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Guardian attendance alerts')",
+    "notification settings",
+  );
+  await client.evaluate(
+    "(()=>{const i=document.querySelector('input[aria-label=\"Daily summary local time\"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,'18:30');i.dispatchEvent(new Event('input',{bubbles:true}));i.dispatchEvent(new Event('change',{bubbles:true}));})()",
+  );
+  await click("Save notification settings");
+  await waitFor(
+    client,
+    "window.__periodRequests.some(r=>r.rpc==='set_period_notification_settings'&&r.body.p_summary_time==='18:30')",
+    "institution summary time saved",
+  );
   await choose("select[aria-label='Timetable owner section']", "section-a");
   await choose("select[aria-label='Timetable subject']", "subject");
   await choose("select[aria-label='Timetable faculty']", "faculty");
@@ -913,6 +958,11 @@ try {
     "window.__periodRequests.some(r=>r.rpc==='correct_period_mark')",
     "same-faculty correction",
   );
+  await waitFor(
+    client,
+    "Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Refresh roster and authority'&&!b.disabled)",
+    "correction transaction completed before refreshing",
+  );
   await client.evaluate("window.__periodForceLock()");
   await click("Refresh roster and authority");
   await waitFor(
@@ -935,6 +985,17 @@ try {
     client,
     "document.body.innerText.includes('Recorded North Student')",
     "CI filtered merged roster",
+  );
+  await waitFor(
+    client,
+    "document.querySelector('section[aria-label=\"Guardian notification status\"]').innerText.includes('provider accepted')",
+    "provider evidence status",
+  );
+  assert.equal(
+    await client.evaluate(
+      "document.querySelector('section[aria-label=\"Guardian notification status\"]').innerText.includes('Recorded South Student')",
+    ),
+    false,
   );
   assert.equal(
     await client.evaluate(

@@ -447,6 +447,27 @@ export async function handleGuardianNotificationDevice(request: Request): Promis
         .eq("parent_id", device.guardian_id)
         .maybeSingle();
       if (communicationError || !communication) return json({ error: "Event unavailable" }, 404);
+      if (
+        (communication.metadata as Record<string, unknown> | null)?.["purpose"] ===
+        "period-attendance"
+      ) {
+        const { data, error } = await database.rpc("period_guardian_event_status", {
+          p_communication: eventId,
+          p_installation: device.id,
+        });
+        if (error) throw new Error("Unable to verify period notification access");
+        if (!data) return json({ error: "Event unavailable" }, 404);
+        const statuses: Record<string, string> = {
+          present: "Present",
+          absent: "Absent",
+          approved_leave: "Approved Leave",
+        };
+        const facts = data.facts as { subject: string; period: string; status: string }[];
+        return json({
+          message: `${data.date}: ${facts.map((f) => `${f.subject}, ${f.period}: ${statuses[f.status] ?? "unavailable"}`).join("; ")}`,
+          kind: data.kind,
+        });
+      }
       // A historical dispatch is not continuing authority to view a student's records.
       const [guardianResult, relationshipResult, institutionResult, studentResult] =
         await Promise.all([

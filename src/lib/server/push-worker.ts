@@ -1,6 +1,7 @@
 /** FCM outbox worker. The scheduler calls this only with an explicit live gate. */
 import { createClient } from "@supabase/supabase-js";
 import { GUARDIAN_NOTIFICATION_CONSENT_VERSION } from "../guardian-consent.ts";
+import { renderPeriodNotification } from "./period-notifications.ts";
 import {
   isFreshAttendanceSession,
   type AttendanceSessionFreshness,
@@ -33,7 +34,10 @@ export type PushWorkerStore = {
   claim: (limit: number) => Promise<PushJob[]>;
   claimSpecific?: (jobId: string) => Promise<PushJob[]>;
   load: (job: PushJob) => Promise<Loaded | null>;
-  begin: (job: PushJob, installation: Installation) => Promise<string>;
+  begin: (
+    job: PushJob,
+    installation: Installation,
+  ) => Promise<string | { status: string; metadata: Record<string, unknown> }>;
   finish: (job: PushJob, installation: Installation, result: PushResult) => Promise<boolean>;
   complete: (job: PushJob, suppressed: boolean) => Promise<string>;
 };
@@ -87,13 +91,15 @@ function supabaseStore(): PushWorkerStore {
           .eq("student_id", communication["student_id"])
           .eq("parent_id", communication["parent_id"])
           .maybeSingle(),
-        db
-          .from("attendance_records")
-          .select("status,attendance_sessions!inner(date,created_at,status,institution_id)")
-          .eq("institution_id", job.institution_id)
-          .eq("student_id", communication["student_id"])
-          .eq("session_id", metadata["attendance_session_id"])
-          .maybeSingle(),
+        metadata["purpose"] === "period-attendance"
+          ? Promise.resolve({ data: null, error: null })
+          : db
+              .from("attendance_records")
+              .select("status,attendance_sessions!inner(date,created_at,status,institution_id)")
+              .eq("institution_id", job.institution_id)
+              .eq("student_id", communication["student_id"])
+              .eq("session_id", metadata["attendance_session_id"])
+              .maybeSingle(),
         db
           .from("guardian_notification_installations")
           .select(
@@ -128,10 +134,11 @@ function supabaseStore(): PushWorkerStore {
         guardian["active"] === true &&
         guardian["communication_consent"] === true &&
         relationship?.receives_notifications === true &&
-        attendance?.status === "absent" &&
-        session?.institution_id === job.institution_id &&
-        isFreshAttendanceSession(session) &&
-        metadata["purpose"] === "absence-alert";
+        (metadata["purpose"] === "period-attendance" ||
+          (attendance?.status === "absent" &&
+            session?.institution_id === job.institution_id &&
+            isFreshAttendanceSession(session) &&
+            metadata["purpose"] === "absence-alert"));
       return {
         communication,
         guardian,
@@ -142,13 +149,13 @@ function supabaseStore(): PushWorkerStore {
       };
     },
     async begin(job, installation) {
-      const { data, error } = await db.rpc("begin_push_dispatch", {
+      const { data, error } = await db.rpc("prepare_push_dispatch", {
         p_job: job.id,
         p_owner: job.lease_owner,
         p_installation: installation.id,
       });
       if (error) throw new Error("Unable to fence FCM dispatch");
-      return String(data);
+      return data as { status: string; metadata: Record<string, unknown> };
     },
     async finish(job, installation, result) {
       const status = result.ok
@@ -182,8 +189,18 @@ function supabaseStore(): PushWorkerStore {
   };
 }
 
-export function renderPushPayload(loaded: Loaded): { title: string; body: string } {
+export function renderPushPayload(loaded: Loaded): {
+  title: string;
+  body: string;
+  expiresAt?: string;
+} {
   const metadata = (loaded.communication["metadata"] ?? {}) as Record<string, unknown>;
+  if (metadata["purpose"] === "period-attendance")
+    return renderPeriodNotification(
+      metadata,
+      String(loaded.student["name"] ?? "Your student"),
+      loaded.institutionName,
+    );
   const dateValue = String(metadata["attendance_date"] ?? "");
   const date = /^\d{4}-\d{2}-\d{2}$/.test(dateValue)
     ? new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" }).format(
@@ -229,22 +246,37 @@ export async function processPushJobs(
         await store.complete(job, true);
         throw new Error("Controlled push requires exactly one eligible installation");
       }
-      const message = renderPushPayload(loaded);
+      let denied = false;
+      let attempted = false;
       for (const installation of loaded.installations) {
         const fence = await store.begin(job, installation);
-        if (fence === "lease_lost") throw new Error("Push job lease lost");
-        if (fence !== "send") continue;
+        const decision = typeof fence === "string" ? fence : fence.status;
+        if (decision === "lease_lost") throw new Error("Push job lease lost");
+        if (decision !== "send") {
+          if (decision === "ineligible") denied = true;
+          continue;
+        }
+        attempted = true;
+        const message = renderPushPayload(
+          typeof fence === "string"
+            ? loaded
+            : {
+                ...loaded,
+                communication: { ...loaded.communication, metadata: fence.metadata },
+              },
+        );
         const result = await send({
           installationId: installation.firebase_installation_id,
           title: message.title,
           body: message.body,
           communicationId: job.communication_id,
           idempotencyKey: `${job.idempotency_key}:${installation.id}`,
+          ...(message.expiresAt ? { expiresAt: message.expiresAt } : {}),
         });
         if (!(await store.finish(job, installation, result)))
           throw new Error("Push dispatch result could not be persisted");
       }
-      const status = await store.complete(job, false);
+      const status = await store.complete(job, denied && !attempted);
       if (status === "lease_lost") throw new Error("Push job lease lost");
       if (status === "queued") summary.retried++;
       else if (status === "failed" || status === "unconfirmed") summary.failed++;

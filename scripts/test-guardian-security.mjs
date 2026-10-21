@@ -55,6 +55,14 @@ async function withDatabase(overrides, run) {
     assert.equal(url.origin, "https://database.example.invalid");
     const table = url.pathname.split("/").at(-1);
     reads.push(table);
+    if (table === "period_guardian_event_status") {
+      assert.equal(init.method, "POST");
+      assert.deepEqual(JSON.parse(init.body), {
+        p_communication: eventId,
+        p_installation: "device",
+      });
+      return Response.json(rows[table]);
+    }
     if (table === "consume_guardian_notification_invitation_with_consent") {
       assert.equal(init.method, "POST");
       const payload = JSON.parse(init.body);
@@ -315,4 +323,44 @@ test("current guardian relationship permits only the scoped attendance status", 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { currentStatus: "absent" });
   });
+});
+test("period guardian event returns only current period facts authorized by the database", async () => {
+  await withDatabase(
+    {
+      communications: {
+        student_id: studentId,
+        metadata: { purpose: "period-attendance", period_event_id: eventId },
+      },
+      period_guardian_event_status: {
+        kind: "correction",
+        date: "2026-10-21",
+        facts: [{ subject: "Mathematics", period: "Period 2", status: "approved_leave" }],
+      },
+    },
+    async (reads) => {
+      const response = await handleGuardianNotificationDevice(request());
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {
+        message: "2026-10-21: Mathematics, Period 2: Approved Leave",
+        kind: "correction",
+      });
+      assert.ok(!reads.includes("attendance_records"));
+    },
+  );
+});
+test("period event denies a stale contact or different guardian device", async () => {
+  await withDatabase(
+    {
+      communications: {
+        student_id: studentId,
+        metadata: { purpose: "period-attendance", period_event_id: eventId },
+      },
+      period_guardian_event_status: null,
+    },
+    async () => {
+      const response = await handleGuardianNotificationDevice(request());
+      assert.equal(response.status, 404);
+      assert.deepEqual(await response.json(), { error: "Event unavailable" });
+    },
+  );
 });
