@@ -6,6 +6,7 @@ import { roleLabels, type StaffWorkspace } from "@/lib/staff-setup";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PeriodSummary } from "@/components/attendance/period-summary";
+import { ProfileLanyard } from "@/components/profile/profile-lanyard";
 export function StaffWorkspacePage() {
   const { user } = useAuth();
   const [workspace, setWorkspace] = useState<StaffWorkspace | null>(null);
@@ -44,44 +45,53 @@ export function StaffWorkspacePage() {
   const staff = workspace.staff;
   return (
     <main className="mx-auto max-w-6xl space-y-5 p-4">
-      <header className="space-y-2">
-        {workspace.institution.logo_data_url && (
-          <img
-            src={workspace.institution.logo_data_url}
-            alt="Institution logo"
-            className="h-14 w-14 object-contain"
-          />
-        )}
-        <p
-          className="font-medium"
-          style={{ color: workspace.institution.brand_color ?? undefined }}
-        >
-          {workspace.institution.brand_name || workspace.institution.name}
-        </p>
-        <h1 className="text-2xl font-semibold">
-          {greeting}, {staff?.full_name ?? user?.name}
-        </h1>
-        <p>{workspace.primary_department ?? workspace.institution.name}</p>
-        {workspace.memberships.length > 1 && (
-          <label className="block">
-            Institution
-            <select
-              aria-label="Active institution"
-              className="ml-2 rounded border bg-background p-2"
-              value={workspace.institution.institution_id}
-              onChange={(e) => {
-                localStorage.setItem("attendai:selected-institution", e.target.value);
-                window.location.assign("/");
-              }}
-            >
-              {workspace.memberships.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+      <header className="profile-greeting">
+        <div className="profile-greeting-copy space-y-2">
+          {workspace.institution.logo_data_url && (
+            <img
+              src={workspace.institution.logo_data_url}
+              alt="Institution logo"
+              className="h-14 w-14 object-contain"
+            />
+          )}
+          <p
+            className="font-medium"
+            style={{ color: workspace.institution.brand_color ?? undefined }}
+          >
+            {workspace.institution.brand_name || workspace.institution.name}
+          </p>
+          <h1 className="text-2xl font-semibold">
+            {greeting}, {staff?.full_name ?? user?.name}
+          </h1>
+          <p>{workspace.primary_department ?? workspace.institution.name}</p>
+          {workspace.memberships.length > 1 && (
+            <label className="block">
+              Institution
+              <select
+                aria-label="Active institution"
+                className="ml-2 rounded border bg-background p-2"
+                value={workspace.institution.institution_id}
+                onChange={(e) => {
+                  localStorage.setItem("attendai:selected-institution", e.target.value);
+                  window.location.assign("/dashboard");
+                }}
+              >
+                {workspace.memberships.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        <ProfileLanyard
+          institution={workspace.institution.institution_id}
+          name={staff?.full_name ?? user?.name ?? "Staff"}
+          role={
+            staff?.designation ?? workspace.roles.map((role) => roleLabels[role] ?? role).join(", ")
+          }
+        />
       </header>
       <PeriodSummary institution={workspace.institution.institution_id} />
       <Card>

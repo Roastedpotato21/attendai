@@ -3,11 +3,16 @@ import { ArrowUpRight, Check } from "lucide-react";
 import { CircuitBoard } from "@/components/landing/fintech-visuals";
 import { welcomeHead } from "@/components/landing/page-head";
 import authCss from "./auth-page.css?url";
+import codeSlotsCss from "./code-slots/code-slots.css?url";
 
 export function authPageHead(title: string, description: string) {
   return {
     meta: [{ title: title + " — AttendAI" }, { name: "description", content: description }],
-    links: [...welcomeHead().links, { rel: "stylesheet", href: authCss }],
+    links: [
+      ...welcomeHead().links,
+      { rel: "stylesheet", href: authCss },
+      { rel: "stylesheet", href: codeSlotsCss },
+    ],
   };
 }
 

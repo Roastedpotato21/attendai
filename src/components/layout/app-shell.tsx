@@ -6,7 +6,8 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useStaffPhoto } from "@/components/profile/use-staff-photo";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth/auth-context";
 import { roleLabels } from "@/lib/staff-setup";
@@ -15,6 +16,7 @@ import { Link } from "@tanstack/react-router";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const photo = useStaffPhoto();
 
   return (
     <SidebarProvider>
@@ -48,11 +50,20 @@ export function AppShell({ children }: { children: ReactNode }) {
                         user.role}
                     </span>
                   </div>
-                  <Avatar className="h-8 w-8 border">
-                    <AvatarFallback className="bg-primary/10 text-xs text-primary">
-                      {user.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <Link to="/staff-profile" aria-label="Open your staff profile">
+                    <Avatar className="h-8 w-8 border">
+                      {photo.data?.data_url && (
+                        <AvatarImage
+                          src={photo.data.data_url}
+                          alt="Your profile photo"
+                          className="object-cover"
+                        />
+                      )}
+                      <AvatarFallback className="bg-primary/10 text-xs text-primary">
+                        {user.name.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
                   <Button variant="ghost" size="icon" onClick={logout} title="Logout">
                     <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                   </Button>

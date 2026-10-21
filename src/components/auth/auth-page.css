@@ -255,6 +255,73 @@
 .aw-auth-footer a {
   padding-block: 8px;
 }
+.aw-email-code {
+  width: 100%;
+  min-width: 0;
+}
+.aw-email-code .aw-auth-reset {
+  text-align: left;
+  margin: 10px 0 18px;
+}
+.aw-email-code .code-slots {
+  margin: 8px 0;
+  max-width: 100%;
+}
+.aw-verification {
+  padding: 0 24px 45px;
+  min-height: 100dvh;
+}
+.aw-verification > main {
+  margin: 40px auto 0;
+  outline: none;
+}
+.aw-verification > main > header {
+  padding-bottom: 24px;
+  border-bottom: 1px solid #68442e30;
+}
+.aw-verification h1 {
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.12;
+  letter-spacing: -0.05em;
+}
+.aw-verification input:not([type="checkbox"]):not([type="file"]):not(.code-slots__input),
+.aw-verification textarea,
+.aw-verification select {
+  background: #f7f6f2;
+  border-radius: 4px;
+  border-color: #a78e73;
+  color: #241a14;
+  font-size: 16px;
+}
+.aw-verification .aw-email-code {
+  max-width: 490px;
+  padding: 24px 0;
+}
+.aw-verification .aw-auth-header nav a {
+  padding-block: 12px;
+}
+.aw-verification input[type="checkbox"] {
+  accent-color: #68442e;
+}
+.aw-verification button {
+  min-height: 42px;
+}
+@media (max-width: 640px) {
+  .aw-verification {
+    padding-inline: 18px;
+  }
+  .aw-verification > main {
+    padding-inline: 0;
+    margin-top: 30px;
+  }
+  .aw-verification .aw-auth-header nav {
+    gap: 14px;
+    font-size: 11px;
+  }
+  .aw-verification .aw-auth-header nav a:first-child {
+    display: none;
+  }
+}
 .aw-auth-signup .aw-auth-main {
   align-items: start;
 }

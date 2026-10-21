@@ -142,6 +142,7 @@ async function submitLogin(client, email, password) {
 function installSupabaseFixture() {
   const realFetch = window.fetch.bind(window);
   window.__fixtureRequests = [];
+  window.__otpRequests = [];
   const user = {
     id: "90000000-0000-4000-8000-000000000001",
     aud: "authenticated",
@@ -203,6 +204,20 @@ function installSupabaseFixture() {
     if (path === "/auth/v1/logout") return json({});
     if (path === "/auth/v1/signup")
       return json({ user: { ...user, email_confirmed_at: null }, session: null });
+    if (path === "/auth/v1/verify") {
+      window.__otpRequests.push({
+        email: body.email,
+        type: body.type,
+        validFixture: body.token === "731942",
+      });
+      if (body.token !== "731942" || body.email !== user.email || body.type !== "email")
+        return json({ code: "otp_expired", msg: "Token has expired or is invalid" }, 403);
+      return json(session());
+    }
+    if (path === "/auth/v1/resend") {
+      window.__otpRequests.push({ email: body.email, type: body.type });
+      return json({});
+    }
     if (path === "/auth/v1/token") {
       if (body.email !== user.email || body.password !== "fixture-pending-password")
         return json({ code: "invalid_credentials", msg: "Invalid login credentials" }, 400);
@@ -322,6 +337,59 @@ try {
     ),
     false,
   );
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('#email-verification-code'))",
+    "signup code slots",
+  );
+  assert.equal(
+    await client.evaluate("document.querySelector('#email-verification-code').autocomplete"),
+    "one-time-code",
+  );
+  assert.equal(
+    await client.evaluate("document.querySelector('#verification-email').value"),
+    "applicant@fixture.invalid",
+  );
+  const pasteCode = async (code) =>
+    client.evaluate(
+      `(()=>{const input=document.querySelector('#email-verification-code');input.focus();const data=new DataTransfer();data.setData('text',${JSON.stringify(code)});input.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,cancelable:true,clipboardData:data}));})()`,
+    );
+  await pasteCode("12");
+  assert.ok(
+    await client.evaluate(
+      "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Verify email code')).disabled",
+    ),
+  );
+  await client.evaluate(
+    "document.querySelector('#email-verification-code').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true,cancelable:true}))",
+  );
+  await pasteCode("000000");
+  await clickButton("Verify email code");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('This code could not be verified')",
+    "expired code feedback",
+  );
+  await waitFor(
+    client,
+    "document.querySelectorAll('.code-slots__slot[data-filled]').length===0",
+    "error drains digits",
+  );
+  await clickButton("Request another verification email");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('a new verification email has been requested')",
+    "honest resend request status",
+  );
+  assert.ok(
+    await client.evaluate(
+      "Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Request another email in')).disabled",
+    ),
+  );
+  assert.equal(
+    await client.evaluate("window.__otpRequests.filter(r=>r.type==='signup').length"),
+    1,
+  );
   await navigate(client, "/create-account");
   await waitFor(client, "Boolean(document.querySelector('#institution-search'))", "manual search");
   await fill(client, "#institution-search", "Unlisted Fixture");
@@ -392,6 +460,58 @@ try {
   await waitForLoginForm(client);
   await navigate(client, "/attendance");
   await waitForPath(client, "/login");
+  await navigate(client, "/institution-verification");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('#email-verification-code'))",
+    "code entry after reload",
+  );
+  assert.equal(
+    await client.evaluate("document.querySelector('#email-verification-code').value"),
+    "",
+  );
+  await fill(client, "#verification-email", "applicant@fixture.invalid");
+  await client.call("Emulation.setDeviceMetricsOverride", {
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 1,
+    mobile: true,
+  });
+  await pasteCode("731942");
+  await waitFor(
+    client,
+    "document.querySelectorAll('.code-slots__slot[data-filled]').length===6",
+    "pasted digits in slots",
+  );
+  assert.ok(
+    await client.evaluate("document.documentElement.scrollWidth<=innerWidth+1"),
+    "Mobile OTP fits",
+  );
+  await clickButton("Verify email code");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Email verified.')",
+    "real verification response required",
+  );
+  assert.ok(
+    await client.evaluate(
+      "document.body.innerText.includes('institution still requires independent review')",
+    ),
+  );
+  await client.evaluate(
+    "Array.from(document.querySelectorAll('a')).find(a=>a.textContent.includes('Continue institution verification')).click()",
+  );
+  await waitFor(
+    client,
+    "document.body?.innerText.includes('Pending verification')",
+    "OTP enters pending workflow",
+  );
+  assert.equal(
+    await client.evaluate(
+      "window.__fixtureRequests.some(p=>p.includes('provision_my_new_institution'))",
+    ),
+    false,
+  );
   console.log(
     "Auth browser checks passed: empty credentials; ambiguous registry search; manual fallback; identity-only signup; invalid password; pending login/reload; six URL gates; reviewer denial; legal access; logout. All Supabase responses used isolated browser fixtures.",
   );

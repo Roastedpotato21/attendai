@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
 
 const baseUrl = process.argv[2] ?? "http://localhost:8081";
 assert.ok(
@@ -369,6 +370,18 @@ function installStaffFixture() {
       ]);
     if (path === "/rest/v1/institutions") return json([{ id: inst }]);
     const rpc = path.split("/rpc/")[1];
+    const photoKey = "__fixturePhoto:" + user.id;
+    if (rpc === "my_staff_profile_photo")
+      return json(JSON.parse(localStorage.getItem(photoKey) ?? '{"data_url":null,"revision":0}'));
+    if (rpc === "save_my_staff_profile_photo") {
+      const prior = JSON.parse(localStorage.getItem(photoKey) ?? '{"revision":0}');
+      const photo = {
+        data_url: body.p_base64 ? `data:${body.p_mime};base64,${body.p_base64}` : null,
+        revision: prior.revision + 1,
+      };
+      localStorage.setItem(photoKey, JSON.stringify(photo));
+      return json(photo);
+    }
     if (rpc === "my_staff_portal_access")
       return json({
         status: "allowed",
@@ -548,6 +561,102 @@ try {
     client,
     "document.body.innerText.includes('Institution Owner')",
     "return to protected dashboard",
+  );
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('.profile-lanyard-stage'))",
+    "compact profile lanyard",
+  );
+  assert.equal(
+    await client.evaluate(
+      "document.querySelector('.profile-lanyard-stage').getBoundingClientRect().height",
+    ),
+    190,
+  );
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('.profile-lanyard-stage [data-rendered=true]'))",
+    "actual 3D lanyard renderer",
+  );
+  await client.evaluate(
+    "document.querySelector('button[aria-label=\"Add profile photo\"]').click()",
+  );
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('input[type=file]'))",
+    "photo upload dialog",
+  );
+  await client.evaluate(
+    `new Promise(resolve=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=40;const ctx=canvas.getContext('2d');ctx.fillStyle='#333333';ctx.fillRect(0,0,40,40);ctx.fillStyle='#ffffff';ctx.fillRect(10,10,20,20);canvas.toBlob(blob=>{const data=new DataTransfer();data.items.add(new File([blob],'isolated-photo.png',{type:'image/png'}));const input=document.querySelector('input[type=file]');input.files=data.files;input.dispatchEvent(new Event('change',{bubbles:true}));resolve();},'image/png');})`,
+  );
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Preview — save to apply.')",
+    "processed photo preview",
+  );
+  await click("Save photo");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('img[alt=\"Your profile photo\"]'))",
+    "header avatar uses saved photo",
+  );
+  assert.ok(
+    await client.evaluate(
+      "document.querySelector('img[alt=\"Your profile photo\"]').src.startsWith('data:image/jpeg;base64,')",
+    ),
+  );
+  await navigate(client, "/dashboard");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('img[alt=\"Your profile photo\"]'))",
+    "persisted photo after reload",
+  );
+  await mkdir(".tmp/profile-screenshots", { recursive: true });
+  for (const width of [1440, 390]) {
+    await client.call("Emulation.setDeviceMetricsOverride", {
+      width,
+      height: 1000,
+      deviceScaleFactor: 1,
+      mobile: width < 600,
+    });
+    await client.evaluate("scrollTo(0,0)");
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    assert.ok(
+      await client.evaluate("document.documentElement.scrollWidth<=innerWidth+1"),
+      "profile fits viewport",
+    );
+    const screen = await client.call("Page.captureScreenshot", { format: "png" });
+    await writeFile(
+      `.tmp/profile-screenshots/dashboard-${width}.png`,
+      Buffer.from(screen.data, "base64"),
+    );
+  }
+  await client.call("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
+  await waitFor(
+    client,
+    "!document.querySelector('.profile-lanyard-stage canvas')",
+    "static reduced-motion badge",
+  );
+  assert.ok(await client.evaluate("!document.querySelector('.profile-badge-fallback').hidden"));
+  await client.call("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "no-preference" }],
+  });
+  await client.call("Emulation.setDeviceMetricsOverride", {
+    width: 1440,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  await client.evaluate(
+    "document.querySelector('button[aria-label=\"Change profile photo\"]').click()",
+  );
+  await click("Remove photo");
+  await waitFor(
+    client,
+    "!document.querySelector('img[alt=\"Your profile photo\"]')",
+    "removed photo clears avatar",
   );
   assert.equal(
     await client.evaluate("document.body.innerText.includes('Institution Owner')"),

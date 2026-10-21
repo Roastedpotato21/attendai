@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { KeyRound } from "lucide-react";
+import { AuthPage, authPageHead } from "@/components/auth/auth-page";
 
 import { useAuth } from "@/components/auth/auth-context";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,10 @@ import { hasDatabaseConnection, supabase } from "@/lib/db/connection";
 import { acceptPolicies } from "@/lib/policy-acceptance";
 
 export const Route = createFileRoute("/accept-invite")({
-  head: () => ({
-    meta: [{ title: "Set your password — AttendAI" }, { name: "referrer", content: "no-referrer" }],
-  }),
+  head: () => {
+    const head = authPageHead("Set your password", "Complete your verified AttendAI invitation.");
+    return { ...head, meta: [...head.meta, { name: "referrer", content: "no-referrer" }] };
+  },
   component: AcceptInvitePage,
 });
 
@@ -87,15 +88,14 @@ function AcceptInvitePage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-muted/20 p-4">
-      <Card className="w-full max-w-md border-primary/20 shadow-lg">
-        <CardHeader className="pb-6 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <KeyRound className="h-6 w-6" />
-          </div>
-          <CardTitle className="text-2xl font-display">Set your AttendAI password</CardTitle>
-          <CardDescription>
-            Your email has been verified. Set a password to finish joining your institution.
+    <AuthPage>
+      <Card className="aw-auth-card">
+        <CardHeader>
+          <p className="aw-kicker">YOUR INVITATION</p>
+          <h1 id="auth-title">Set your AttendAI password</h1>
+          <CardDescription className="aw-auth-description">
+            Use your verified invitation link, then set a password to finish joining your
+            institution.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -176,6 +176,6 @@ function AcceptInvitePage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AuthPage>
   );
 }

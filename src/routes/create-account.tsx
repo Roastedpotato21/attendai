@@ -10,6 +10,7 @@ import { supabase } from "@/lib/db/connection";
 import { normalizeAuthEmail, signUpErrorMessage } from "@/lib/auth-errors";
 import type { RegistryMatch } from "@/lib/institution-verification";
 import { AuthPage, authPageHead } from "@/components/auth/auth-page";
+import { EmailCodeVerification } from "@/components/auth/email-code-verification";
 
 export const Route = createFileRoute("/create-account")({
   head: () =>
@@ -112,18 +113,19 @@ function CreateAccountPage() {
                 <Link to="/dashboard">Go to dashboard</Link>
               </Button>
             </>
-          ) : verificationAccess ? (
+          ) : verificationAccess && !sent ? (
             <Button asChild>
               <Link to="/institution-verification">Continue verification</Link>
             </Button>
           ) : sent ? (
-            <div role="status" className="space-y-3">
+            <div className="space-y-3">
               <h2 className="font-semibold">Check your email</h2>
               <p>
                 Verify your account identity using the email link. If an account already exists,
                 sign in or reset its password. Your institution will remain pending until
                 independently approved.
               </p>
+              <EmailCodeVerification initialEmail={normalizeAuthEmail(email)} />
               <Button asChild variant="outline">
                 <Link to="/login" search={{ redirect: undefined }}>
                   Sign in
