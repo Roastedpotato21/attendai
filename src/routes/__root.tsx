@@ -153,7 +153,9 @@ function AuthWrapper() {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
-  const isPublicContent = ["/privacy", "/terms", "/guardian-notifications"].includes(pathname);
+  const isPublicContent = ["/welcome", "/privacy", "/terms", "/guardian-notifications"].includes(
+    pathname,
+  );
   const [policyState, setPolicyState] = useState<"checking" | "accepted" | "required">("checking");
 
   useEffect(() => {

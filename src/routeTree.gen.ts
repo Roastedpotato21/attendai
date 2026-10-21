@@ -48,6 +48,7 @@ import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TimetableRouteImport } from './routes/timetable'
 import { Route as VoiceCallsRouteImport } from './routes/voice-calls'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -244,6 +245,11 @@ const VoiceCallsRoute = VoiceCallsRouteImport.update({
   path: '/voice-calls',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -285,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/timetable': typeof TimetableRoute
   '/voice-calls': typeof VoiceCallsRoute
+  '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -326,6 +333,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/timetable': typeof TimetableRoute
   '/voice-calls': typeof VoiceCallsRoute
+  '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -368,6 +376,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/timetable': typeof TimetableRoute
   '/voice-calls': typeof VoiceCallsRoute
+  '/welcome': typeof WelcomeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -411,6 +420,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/timetable'
     | '/voice-calls'
+    | '/welcome'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -452,6 +462,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/timetable'
     | '/voice-calls'
+    | '/welcome'
   id:
     | '__root__'
     | '/'
@@ -493,6 +504,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/timetable'
     | '/voice-calls'
+    | '/welcome'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -535,6 +547,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TimetableRoute: typeof TimetableRoute
   VoiceCallsRoute: typeof VoiceCallsRoute
+  WelcomeRoute: typeof WelcomeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -812,6 +825,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VoiceCallsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -855,6 +875,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TimetableRoute: TimetableRoute,
   VoiceCallsRoute: VoiceCallsRoute,
+  WelcomeRoute: WelcomeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

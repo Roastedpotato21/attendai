@@ -24,6 +24,7 @@ export interface RouteAuthRule {
  */
 export const routeAuth: Record<string, RouteAuthRule> = {
   // Public routes (no auth required)
+  "/welcome": { public: true },
   "/login": { public: true },
   "/create-account": { public: true },
   "/institution-verification": { public: true },
