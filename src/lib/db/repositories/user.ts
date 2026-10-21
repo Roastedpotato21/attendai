@@ -50,6 +50,18 @@ export const userRepository = {
     const activeInstitutionIds = new Set(institutions?.map((institution) => institution.id));
     if (!activeInstitutionIds.size) return { status: "membership_inactive" };
 
+    const requested =
+      typeof window === "undefined"
+        ? null
+        : window.localStorage.getItem("attendai:selected-institution");
+    const selected = requested && activeInstitutionIds.has(requested) ? requested : null;
+    const { data: portal, error: portalError } = await supabase.rpc("my_staff_portal_access", {
+      p_institution: selected,
+    });
+    if (portalError) throw fromSupabaseError("staff role and assignment resolution", portalError);
+    if (portal?.status === "allowed") return { status: "allowed", user: portal.user as DbUser };
+    if (portal) return { status: "role_missing" };
+
     const { data: roles, error: rolesError } = await supabase
       .from("profile_roles")
       .select("institution_id, role_code")

@@ -16,11 +16,13 @@ import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as AuditLogsRouteImport } from './routes/audit-logs'
 import { Route as CheckInRouteImport } from './routes/check-in'
 import { Route as CreateAccountRouteImport } from './routes/create-account'
+import { Route as DepartmentsRouteImport } from './routes/departments'
 import { Route as EscalationsRouteImport } from './routes/escalations'
 import { Route as FacultyRouteImport } from './routes/faculty'
 import { Route as GuardianDevicesRouteImport } from './routes/guardian-devices'
 import { Route as GuardianNotificationsRouteImport } from './routes/guardian-notifications'
 import { Route as InsightsRouteImport } from './routes/insights'
+import { Route as InstitutionProfileRouteImport } from './routes/institution-profile'
 import { Route as InstitutionReviewRouteImport } from './routes/institution-review'
 import { Route as InstitutionVerificationRouteImport } from './routes/institution-verification'
 import { Route as IntegrationsRouteImport } from './routes/integrations'
@@ -29,9 +31,13 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as PolicyConsentRouteImport } from './routes/policy-consent'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ProgramsRouteImport } from './routes/programs'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as RolesRouteImport } from './routes/roles'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StaffRouteImport } from './routes/staff'
+import { Route as StaffAssignmentsRouteImport } from './routes/staff-assignments'
+import { Route as StaffProfileRouteImport } from './routes/staff-profile'
 import { Route as StudentDashboardRouteImport } from './routes/student-dashboard'
 import { Route as StudentsRouteImport } from './routes/students'
 import { Route as TemplatesRouteImport } from './routes/templates'
@@ -73,6 +79,11 @@ const CreateAccountRoute = CreateAccountRouteImport.update({
   path: '/create-account',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DepartmentsRoute = DepartmentsRouteImport.update({
+  id: '/departments',
+  path: '/departments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EscalationsRoute = EscalationsRouteImport.update({
   id: '/escalations',
   path: '/escalations',
@@ -96,6 +107,11 @@ const GuardianNotificationsRoute = GuardianNotificationsRouteImport.update({
 const InsightsRoute = InsightsRouteImport.update({
   id: '/insights',
   path: '/insights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstitutionProfileRoute = InstitutionProfileRouteImport.update({
+  id: '/institution-profile',
+  path: '/institution-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstitutionReviewRoute = InstitutionReviewRouteImport.update({
@@ -138,6 +154,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
   path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgramsRoute = ProgramsRouteImport.update({
+  id: '/programs',
+  path: '/programs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -151,6 +172,21 @@ const RolesRoute = RolesRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffRoute = StaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffAssignmentsRoute = StaffAssignmentsRouteImport.update({
+  id: '/staff-assignments',
+  path: '/staff-assignments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffProfileRoute = StaffProfileRouteImport.update({
+  id: '/staff-profile',
+  path: '/staff-profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudentDashboardRoute = StudentDashboardRouteImport.update({
@@ -187,11 +223,13 @@ export interface FileRoutesByFullPath {
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
   '/create-account': typeof CreateAccountRoute
+  '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
   '/guardian-devices': typeof GuardianDevicesRoute
   '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
+  '/institution-profile': typeof InstitutionProfileRoute
   '/institution-review': typeof InstitutionReviewRoute
   '/institution-verification': typeof InstitutionVerificationRoute
   '/integrations': typeof IntegrationsRoute
@@ -200,9 +238,13 @@ export interface FileRoutesByFullPath {
   '/messages': typeof MessagesRoute
   '/policy-consent': typeof PolicyConsentRoute
   '/privacy': typeof PrivacyRoute
+  '/programs': typeof ProgramsRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
+  '/staff': typeof StaffRoute
+  '/staff-assignments': typeof StaffAssignmentsRoute
+  '/staff-profile': typeof StaffProfileRoute
   '/student-dashboard': typeof StudentDashboardRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
@@ -217,11 +259,13 @@ export interface FileRoutesByTo {
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
   '/create-account': typeof CreateAccountRoute
+  '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
   '/guardian-devices': typeof GuardianDevicesRoute
   '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
+  '/institution-profile': typeof InstitutionProfileRoute
   '/institution-review': typeof InstitutionReviewRoute
   '/institution-verification': typeof InstitutionVerificationRoute
   '/integrations': typeof IntegrationsRoute
@@ -230,9 +274,13 @@ export interface FileRoutesByTo {
   '/messages': typeof MessagesRoute
   '/policy-consent': typeof PolicyConsentRoute
   '/privacy': typeof PrivacyRoute
+  '/programs': typeof ProgramsRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
+  '/staff': typeof StaffRoute
+  '/staff-assignments': typeof StaffAssignmentsRoute
+  '/staff-profile': typeof StaffProfileRoute
   '/student-dashboard': typeof StudentDashboardRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
@@ -248,11 +296,13 @@ export interface FileRoutesById {
   '/audit-logs': typeof AuditLogsRoute
   '/check-in': typeof CheckInRoute
   '/create-account': typeof CreateAccountRoute
+  '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
   '/guardian-devices': typeof GuardianDevicesRoute
   '/guardian-notifications': typeof GuardianNotificationsRoute
   '/insights': typeof InsightsRoute
+  '/institution-profile': typeof InstitutionProfileRoute
   '/institution-review': typeof InstitutionReviewRoute
   '/institution-verification': typeof InstitutionVerificationRoute
   '/integrations': typeof IntegrationsRoute
@@ -261,9 +311,13 @@ export interface FileRoutesById {
   '/messages': typeof MessagesRoute
   '/policy-consent': typeof PolicyConsentRoute
   '/privacy': typeof PrivacyRoute
+  '/programs': typeof ProgramsRoute
   '/reports': typeof ReportsRoute
   '/roles': typeof RolesRoute
   '/settings': typeof SettingsRoute
+  '/staff': typeof StaffRoute
+  '/staff-assignments': typeof StaffAssignmentsRoute
+  '/staff-profile': typeof StaffProfileRoute
   '/student-dashboard': typeof StudentDashboardRoute
   '/students': typeof StudentsRoute
   '/templates': typeof TemplatesRoute
@@ -280,11 +334,13 @@ export interface FileRouteTypes {
     | '/audit-logs'
     | '/check-in'
     | '/create-account'
+    | '/departments'
     | '/escalations'
     | '/faculty'
     | '/guardian-devices'
     | '/guardian-notifications'
     | '/insights'
+    | '/institution-profile'
     | '/institution-review'
     | '/institution-verification'
     | '/integrations'
@@ -293,9 +349,13 @@ export interface FileRouteTypes {
     | '/messages'
     | '/policy-consent'
     | '/privacy'
+    | '/programs'
     | '/reports'
     | '/roles'
     | '/settings'
+    | '/staff'
+    | '/staff-assignments'
+    | '/staff-profile'
     | '/student-dashboard'
     | '/students'
     | '/templates'
@@ -310,11 +370,13 @@ export interface FileRouteTypes {
     | '/audit-logs'
     | '/check-in'
     | '/create-account'
+    | '/departments'
     | '/escalations'
     | '/faculty'
     | '/guardian-devices'
     | '/guardian-notifications'
     | '/insights'
+    | '/institution-profile'
     | '/institution-review'
     | '/institution-verification'
     | '/integrations'
@@ -323,9 +385,13 @@ export interface FileRouteTypes {
     | '/messages'
     | '/policy-consent'
     | '/privacy'
+    | '/programs'
     | '/reports'
     | '/roles'
     | '/settings'
+    | '/staff'
+    | '/staff-assignments'
+    | '/staff-profile'
     | '/student-dashboard'
     | '/students'
     | '/templates'
@@ -340,11 +406,13 @@ export interface FileRouteTypes {
     | '/audit-logs'
     | '/check-in'
     | '/create-account'
+    | '/departments'
     | '/escalations'
     | '/faculty'
     | '/guardian-devices'
     | '/guardian-notifications'
     | '/insights'
+    | '/institution-profile'
     | '/institution-review'
     | '/institution-verification'
     | '/integrations'
@@ -353,9 +421,13 @@ export interface FileRouteTypes {
     | '/messages'
     | '/policy-consent'
     | '/privacy'
+    | '/programs'
     | '/reports'
     | '/roles'
     | '/settings'
+    | '/staff'
+    | '/staff-assignments'
+    | '/staff-profile'
     | '/student-dashboard'
     | '/students'
     | '/templates'
@@ -371,11 +443,13 @@ export interface RootRouteChildren {
   AuditLogsRoute: typeof AuditLogsRoute
   CheckInRoute: typeof CheckInRoute
   CreateAccountRoute: typeof CreateAccountRoute
+  DepartmentsRoute: typeof DepartmentsRoute
   EscalationsRoute: typeof EscalationsRoute
   FacultyRoute: typeof FacultyRoute
   GuardianDevicesRoute: typeof GuardianDevicesRoute
   GuardianNotificationsRoute: typeof GuardianNotificationsRoute
   InsightsRoute: typeof InsightsRoute
+  InstitutionProfileRoute: typeof InstitutionProfileRoute
   InstitutionReviewRoute: typeof InstitutionReviewRoute
   InstitutionVerificationRoute: typeof InstitutionVerificationRoute
   IntegrationsRoute: typeof IntegrationsRoute
@@ -384,9 +458,13 @@ export interface RootRouteChildren {
   MessagesRoute: typeof MessagesRoute
   PolicyConsentRoute: typeof PolicyConsentRoute
   PrivacyRoute: typeof PrivacyRoute
+  ProgramsRoute: typeof ProgramsRoute
   ReportsRoute: typeof ReportsRoute
   RolesRoute: typeof RolesRoute
   SettingsRoute: typeof SettingsRoute
+  StaffRoute: typeof StaffRoute
+  StaffAssignmentsRoute: typeof StaffAssignmentsRoute
+  StaffProfileRoute: typeof StaffProfileRoute
   StudentDashboardRoute: typeof StudentDashboardRoute
   StudentsRoute: typeof StudentsRoute
   TemplatesRoute: typeof TemplatesRoute
@@ -445,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateAccountRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/departments': {
+      id: '/departments'
+      path: '/departments'
+      fullPath: '/departments'
+      preLoaderRoute: typeof DepartmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/escalations': {
       id: '/escalations'
       path: '/escalations'
@@ -478,6 +563,13 @@ declare module '@tanstack/react-router' {
       path: '/insights'
       fullPath: '/insights'
       preLoaderRoute: typeof InsightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/institution-profile': {
+      id: '/institution-profile'
+      path: '/institution-profile'
+      fullPath: '/institution-profile'
+      preLoaderRoute: typeof InstitutionProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/institution-review': {
@@ -536,6 +628,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programs': {
+      id: '/programs'
+      path: '/programs'
+      fullPath: '/programs'
+      preLoaderRoute: typeof ProgramsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports': {
       id: '/reports'
       path: '/reports'
@@ -555,6 +654,27 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staff': {
+      id: '/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staff-assignments': {
+      id: '/staff-assignments'
+      path: '/staff-assignments'
+      fullPath: '/staff-assignments'
+      preLoaderRoute: typeof StaffAssignmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staff-profile': {
+      id: '/staff-profile'
+      path: '/staff-profile'
+      fullPath: '/staff-profile'
+      preLoaderRoute: typeof StaffProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/student-dashboard': {
@@ -603,11 +723,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuditLogsRoute: AuditLogsRoute,
   CheckInRoute: CheckInRoute,
   CreateAccountRoute: CreateAccountRoute,
+  DepartmentsRoute: DepartmentsRoute,
   EscalationsRoute: EscalationsRoute,
   FacultyRoute: FacultyRoute,
   GuardianDevicesRoute: GuardianDevicesRoute,
   GuardianNotificationsRoute: GuardianNotificationsRoute,
   InsightsRoute: InsightsRoute,
+  InstitutionProfileRoute: InstitutionProfileRoute,
   InstitutionReviewRoute: InstitutionReviewRoute,
   InstitutionVerificationRoute: InstitutionVerificationRoute,
   IntegrationsRoute: IntegrationsRoute,
@@ -616,9 +738,13 @@ const rootRouteChildren: RootRouteChildren = {
   MessagesRoute: MessagesRoute,
   PolicyConsentRoute: PolicyConsentRoute,
   PrivacyRoute: PrivacyRoute,
+  ProgramsRoute: ProgramsRoute,
   ReportsRoute: ReportsRoute,
   RolesRoute: RolesRoute,
   SettingsRoute: SettingsRoute,
+  StaffRoute: StaffRoute,
+  StaffAssignmentsRoute: StaffAssignmentsRoute,
+  StaffProfileRoute: StaffProfileRoute,
   StudentDashboardRoute: StudentDashboardRoute,
   StudentsRoute: StudentsRoute,
   TemplatesRoute: TemplatesRoute,

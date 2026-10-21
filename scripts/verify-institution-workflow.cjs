@@ -473,6 +473,11 @@ module.exports = async function verifyInstitutionWorkflow(db) {
       ),
       true,
     );
+    await require("./verify-staff-setup.cjs")(db, {
+      owner: applicant,
+      other: outsider,
+      institution,
+    });
     await role(outsider);
     await denied(
       "SELECT public.start_institution_verification($1,$2)",

@@ -17,7 +17,7 @@ interface AuthContextType {
   /** Password login — returns the AuthUser for post-login routing */
   loginWithPassword: (email: string, password: string) => Promise<AuthUser | null>;
   /** Complete a Supabase invitation and verify its institution membership and role. */
-  completeInvitation: (password: string) => Promise<AuthUser | null>;
+  completeInvitation: (password: string, staffInvitation?: string) => Promise<AuthUser | null>;
   sendPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -56,6 +56,11 @@ function toAuthUser(dbUser: {
   email: string;
   role: UserRole;
   studentId?: string | null;
+  staffModel?: boolean;
+  institutionId?: string;
+  setupRoles?: string[];
+  canManageSetup?: boolean;
+  legacyClassAccess?: boolean;
 }): AuthUser {
   const u: AuthUser = {
     id: dbUser.id,
@@ -63,6 +68,11 @@ function toAuthUser(dbUser: {
     email: dbUser.email,
     role: dbUser.role,
   };
+  if (dbUser.staffModel !== undefined) u.staffModel = dbUser.staffModel;
+  if (dbUser.institutionId !== undefined) u.institutionId = dbUser.institutionId;
+  if (dbUser.setupRoles !== undefined) u.setupRoles = dbUser.setupRoles;
+  if (dbUser.canManageSetup !== undefined) u.canManageSetup = dbUser.canManageSetup;
+  if (dbUser.legacyClassAccess !== undefined) u.legacyClassAccess = dbUser.legacyClassAccess;
   if (dbUser.studentId) u.studentId = dbUser.studentId;
   return u;
 }
@@ -259,7 +269,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // -------------------------------------------------------------------------
   // Invitation and password-recovery completion
   // -------------------------------------------------------------------------
-  const completeInvitation = async (password: string): Promise<AuthUser | null> => {
+  const completeInvitation = async (
+    password: string,
+    staffInvitation?: string,
+  ): Promise<AuthUser | null> => {
     if (!hasDatabaseConnection() || !supabase) {
       throw new Error("Invitation acceptance is available only with Supabase.");
     }
@@ -280,7 +293,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // A password-recovery session for an already active account has no
       // pending invitation; in that case access resolution below still proves
       // the account is authorized. A pending invite must activate successfully.
-      const { error: activationError } = await supabase.rpc("activate_my_staff_invitation");
+      const activation = staffInvitation
+        ? await supabase.rpc("accept_staff_setup_invitation", { p_token: staffInvitation })
+        : await supabase.rpc("activate_my_staff_invitation");
+      const activationError = activation.error;
+      if (staffInvitation && activationError) throw activationError;
+      if (!activationError && typeof activation.data === "string") {
+        window.localStorage.setItem("attendai:selected-institution", activation.data);
+      }
       const resolution = await userRepository.resolveStaffAccess(data.user.id);
       if (resolution.status !== "allowed" && (await allowVerificationSession())) {
         setUser(null);
@@ -315,6 +335,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    window.localStorage.removeItem("attendai:selected-institution");
+    window.sessionStorage.removeItem("attendai:staff-invitation");
     if (hasDatabaseConnection() && supabase) {
       const { error } = await supabase.auth.signOut();
       if (error) throw new Error(error.message);

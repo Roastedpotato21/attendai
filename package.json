@@ -17,6 +17,8 @@
     "test:attendance-supabase": "node --env-file-if-exists=.env scripts/verify-attendance-supabase.mjs",
     "test:postgres": "node --experimental-strip-types scripts/verify-postgres.cjs",
     "test:institutions": "node --experimental-strip-types --test scripts/test-institution-verification.mjs",
+    "test:staff": "node --experimental-strip-types --test scripts/test-staff-setup.mjs",
+    "test:staff-browser": "node scripts/test-staff-browser.mjs",
     "verification:import": "node --experimental-strip-types --env-file-if-exists=.env scripts/import-institution-registry.mjs",
     "verification:prune": "node --env-file-if-exists=.env scripts/prune-verification-evidence.mjs",
     "bootstrap:admin": "node --env-file-if-exists=.env scripts/bootstrap-admin.mjs",

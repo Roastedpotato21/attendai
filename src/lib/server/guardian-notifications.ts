@@ -107,24 +107,16 @@ async function staffContext(request: Request, database: SupabaseClient) {
   if (!bearer?.startsWith("Bearer ")) return null;
   const { data: auth, error: authError } = await database.auth.getUser(bearer.slice(7));
   if (authError || !auth.user) return null;
-  const { data: profile, error: profileError } = await database
-    .from("profiles")
-    .select("id,status")
-    .eq("auth_user_id", auth.user.id)
-    .maybeSingle();
-  if (profileError || !profile || profile.status !== "active") return null;
-  const { data: roles, error: rolesError } = await database
-    .from("profile_roles")
-    .select(
-      "institution_id,profile_institutions!profile_roles_membership_fkey!inner(status),institutions!inner(status)",
-    )
-    .eq("profile_id", profile.id)
-    .in("role_code", ["admin", "staff"])
-    .eq("profile_institutions.status", "active")
-    .eq("institutions.status", "active");
+  const { data: roles, error: rolesError } = await database.rpc(
+    "authorized_staff_admin_institutions",
+    { p_user: auth.user.id },
+  );
   if (rolesError) throw new Error("Unable to verify staff membership");
-  const ids = [...new Set((roles ?? []).map((row) => String(row.institution_id)))];
-  return ids.length === 1 ? { profileId: profile.id, institutionId: ids[0]! } : null;
+  const memberships = (roles ?? []) as { institution_id: string; profile_id: string }[];
+  const ids = [...new Set(memberships.map((row) => row.institution_id))];
+  return ids.length === 1
+    ? { profileId: memberships[0]!.profile_id, institutionId: ids[0]! }
+    : null;
 }
 
 /** Staff list, invitation creation and device revocation. */

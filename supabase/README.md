@@ -60,6 +60,12 @@ role, and faculty/class assignment policies.
 
 ## Staff provisioning flow
 
+Phase 2A adds institution setup and the staff model through migrations 00030–00033.
+Use [the setup guide](../docs/institution-setup-phase2a.md) for the current staff
+invitation and role/assignment workflow. Invitations generate private links for
+manual delivery and do not report email delivery. Legacy staff write endpoints
+are retired.
+
 New institutions begin with registry search at `/create-account`. Email
 verification creates only an applicant identity. The seven-step
 `/institution-verification` workflow requires independently reviewed existence,
@@ -76,12 +82,11 @@ for registry imports, reviewer appointment, private storage and retention.
 Add the deployed `/institution-verification` and `/accept-invite` URLs to
 Supabase Auth's Redirect URLs list. Keep email confirmation enabled.
 
-Once signed in, that administrator can use **Faculty & Classes → Invite
-staff**. The server verifies the caller's active institution-admin assignment,
-sends a Supabase Auth invite, and records the recipient's active membership
-and `faculty` or `staff` role. The recipient verifies their email, chooses an
-AttendAI password at `/accept-invite`, and reaches the dashboard only after
-the same membership and role validation used at password login succeeds.
+Once signed in, the owner/admin can use **Institution Setup → Staff**. The server
+checks current owner/admin authority, generates a private Auth/account invitation
+link and records a pending institution invitation. The recipient verifies their
+email, accepts policies and finishes `/accept-invite` with the separate one-use
+institution token. Only then do the membership and assigned roles become active.
 
 Add the deployed `/accept-invite` URL to Supabase Auth's Redirect URLs list.
 Never put `SUPABASE_SERVICE_ROLE_KEY` in a

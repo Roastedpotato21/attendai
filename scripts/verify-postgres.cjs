@@ -107,6 +107,11 @@ async function main() {
     WHERE v.active ON CONFLICT DO NOTHING;
   `);
   console.log("  ✓ fixtures.sql applied successfully");
+  // Exercise upgrade behavior against existing isolated identities as well as
+  // fresh registrations; no legacy subjects or terms are fabricated.
+  await client.query(
+    "SELECT public.import_existing_staff_membership(profile_id,institution_id) FROM public.profile_institutions WHERE status='active'",
+  );
 
   await client.query(
     fs.readFileSync(
@@ -175,7 +180,7 @@ async function main() {
     throw new Error("Pending staff invitation was not activated for its assigned institution");
   }
   const staffAccess = await client.query(
-    `SELECT public.has_institution_role($1, ARRAY['staff']::user_role[]) AS allowed;`,
+    `SELECT (public.my_staff_portal_access($1)->>'status'='allowed') AS allowed;`,
     [lifecycleInstitutionId],
   );
   if (!staffAccess.rows[0]?.allowed) {
@@ -191,7 +196,7 @@ async function main() {
     await client.query(`SET ROLE authenticated;`);
     await client.query(`SELECT set_config('request.jwt.claim.sub', '${lifecycleAuthId}', false);`);
     const deniedAccess = await client.query(
-      `SELECT public.has_institution_role($1, ARRAY['staff']::user_role[]) AS allowed;`,
+      `SELECT public.is_institution_member($1) AND coalesce(public.my_staff_portal_access()->>'status'='allowed',false) AS allowed;`,
       [lifecycleInstitutionId],
     );
     if (deniedAccess.rows[0]?.allowed) {

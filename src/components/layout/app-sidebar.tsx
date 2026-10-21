@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/sidebar";
 
 import { routeAuth } from "@/lib/route-auth";
+import { staffRouteAllowed } from "@/lib/staff-setup";
 
 type NavItem = {
   title: string;
@@ -51,6 +52,7 @@ const groups: NavGroup[] = [
     label: "Overview",
     items: [
       { title: "Dashboard", url: "/", icon: LayoutDashboard },
+      { title: "My Staff Profile", url: "/staff-profile", icon: Users },
       { title: "My Attendance", url: "/student-dashboard", icon: LayoutDashboard },
       { title: "Attendance", url: "/attendance", icon: CalendarCheck },
       { title: "Students & Parents", url: "/students", icon: Users },
@@ -74,6 +76,16 @@ const groups: NavGroup[] = [
       { title: "Escalations", url: "/escalations", icon: TriangleAlert },
       { title: "Reports", url: "/reports", icon: FileBarChart },
       { title: "Faculty & Classes", url: "/faculty", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Institution Setup",
+    items: [
+      { title: "Institution Profile", url: "/institution-profile", icon: Settings },
+      { title: "Departments", url: "/departments", icon: GraduationCap },
+      { title: "Programs & Structure", url: "/programs", icon: GraduationCap },
+      { title: "Staff", url: "/staff", icon: Users },
+      { title: "Roles & Assignments", url: "/staff-assignments", icon: ShieldCheck },
     ],
   },
   {
@@ -103,6 +115,15 @@ export function AppSidebar() {
       return {
         ...g,
         items: g.items.filter((item) => {
+          if (
+            !staffRouteAllowed(
+              item.url,
+              !!user?.staffModel,
+              !!user?.canManageSetup,
+              !!user?.legacyClassAccess,
+            )
+          )
+            return false;
           const rule = routeAuth[item.url];
           if (!rule || !rule.allowedRoles) return true;
           return rule.allowedRoles.includes(role);

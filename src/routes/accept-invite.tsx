@@ -11,7 +11,9 @@ import { hasDatabaseConnection, supabase } from "@/lib/db/connection";
 import { acceptPolicies } from "@/lib/policy-acceptance";
 
 export const Route = createFileRoute("/accept-invite")({
-  head: () => ({ meta: [{ title: "Set your password — AttendAI" }] }),
+  head: () => ({
+    meta: [{ title: "Set your password — AttendAI" }, { name: "referrer", content: "no-referrer" }],
+  }),
   component: AcceptInvitePage,
 });
 
@@ -25,8 +27,17 @@ function AcceptInvitePage() {
   const [isValidInvite, setIsValidInvite] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staffInvitation, setStaffInvitation] = useState<string | undefined>();
 
   useEffect(() => {
+    const callback = new URL(window.location.href);
+    const invitation = callback.searchParams.get("staff_invitation");
+    if (invitation && /^[0-9a-f]{64}$/.test(invitation)) {
+      window.sessionStorage.setItem("attendai:staff-invitation", invitation);
+      callback.searchParams.delete("staff_invitation");
+      window.history.replaceState(null, "", callback.pathname + callback.search + callback.hash);
+    }
+    setStaffInvitation(window.sessionStorage.getItem("attendai:staff-invitation") ?? undefined);
     let active = true;
     const validateInvite = async () => {
       if (!hasDatabaseConnection() || !supabase) {
@@ -36,7 +47,7 @@ function AcceptInvitePage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (active) setIsValidInvite(Boolean(user));
+      if (active) setIsValidInvite(Boolean(user?.email_confirmed_at));
     };
     void validateInvite();
     return () => {
@@ -62,7 +73,8 @@ function AcceptInvitePage() {
     setIsSubmitting(true);
     try {
       await acceptPolicies("signup");
-      const staff = await completeInvitation(password);
+      const staff = await completeInvitation(password, staffInvitation);
+      window.sessionStorage.removeItem("attendai:staff-invitation");
       await router.navigate({ to: staff ? "/" : "/institution-verification", replace: true });
     } catch (acceptError) {
       setError(acceptError instanceof Error ? acceptError.message : "Unable to accept invitation.");

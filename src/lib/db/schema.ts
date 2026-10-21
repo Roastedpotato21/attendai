@@ -43,6 +43,11 @@ export type DbUpdate<T extends BaseEntity> = Partial<Omit<T, "id" | "createdAt" 
 // ---------------------------------------------------------------------------
 
 export interface DbUser extends BaseEntity {
+  staffModel?: boolean;
+  institutionId?: string;
+  setupRoles?: string[];
+  canManageSetup?: boolean;
+  legacyClassAccess?: boolean;
   name: string;
   email: string;
   role: UserRole;

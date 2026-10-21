@@ -17,6 +17,7 @@ import type { AuthUser } from "@/lib/types";
 import { getPublicRoutes, isRouteAllowed } from "@/lib/route-auth";
 import { currentPolicies } from "@/lib/policy-acceptance";
 import { hasDatabaseConnection } from "@/lib/db/connection";
+import { staffRouteAllowed } from "@/lib/staff-setup";
 
 function NotFoundComponent() {
   return (
@@ -214,6 +215,17 @@ function AuthWrapper() {
         search: { redirect: pathname },
         replace: true,
       });
+    } else if (
+      user &&
+      !isPublicRoute &&
+      !staffRouteAllowed(
+        pathname,
+        !!user.staffModel,
+        !!user.canManageSetup,
+        !!user.legacyClassAccess,
+      )
+    ) {
+      void router.navigate({ to: "/", replace: true });
     } else if (user && pathname === "/login") {
       // Authenticated but on login page → redirect to home
       void router.navigate({ to: "/", replace: true });
@@ -261,6 +273,12 @@ function AuthWrapper() {
     return null;
 
   // Block rendering if the user's role is not allowed for this route
+  if (
+    user &&
+    !isPublicRoute &&
+    !staffRouteAllowed(pathname, !!user.staffModel, !!user.canManageSetup, !!user.legacyClassAccess)
+  )
+    return null;
   if (user && !isRouteAllowed(pathname, user.role)) {
     return null;
   }

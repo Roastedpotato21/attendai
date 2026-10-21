@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/components/auth/auth-context";
+import { StaffWorkspacePage } from "@/components/staff/staff-workspace";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import {
@@ -67,6 +69,10 @@ const pieColors = [
 ];
 
 function Dashboard() {
+  const { user } = useAuth();
+  return user?.staffModel ? <StaffWorkspacePage /> : <LegacyDashboard />;
+}
+function LegacyDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [absentToday, setAbsentToday] = useState<Student[]>([]);

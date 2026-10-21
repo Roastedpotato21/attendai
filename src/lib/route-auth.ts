@@ -54,6 +54,12 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   "/escalations": { allowedRoles: ["admin", "staff"] },
   "/reports": { allowedRoles: ["admin", "faculty", "staff"] },
   "/faculty": { allowedRoles: ["admin"] },
+  "/staff-profile": { allowedRoles: ["admin", "faculty", "staff"] },
+  "/institution-profile": { allowedRoles: ["admin"] },
+  "/departments": { allowedRoles: ["admin"] },
+  "/programs": { allowedRoles: ["admin"] },
+  "/staff": { allowedRoles: ["admin"] },
+  "/staff-assignments": { allowedRoles: ["admin"] },
 
   // Administration
   "/integrations": { allowedRoles: ["admin"] },

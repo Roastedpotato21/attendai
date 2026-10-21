@@ -23,6 +23,10 @@ Institution registration requires independent existence and representative
 authority review. The workflow, additive migrations and production setup are in
 [`docs/institution-verification.md`](docs/institution-verification.md).
 
+Institution profiles, academic structure, staff roles, scoped responsibilities
+and private invitation links are documented in
+[`docs/institution-setup-phase2a.md`](docs/institution-setup-phase2a.md).
+
 ## Built with
 
 - TanStack Start

@@ -129,6 +129,11 @@ export type CallRecord = {
 export type UserRole = "admin" | "faculty" | "student" | "staff";
 
 export type AuthUser = {
+  staffModel?: boolean;
+  institutionId?: string;
+  setupRoles?: string[];
+  canManageSetup?: boolean;
+  legacyClassAccess?: boolean;
   id: string;
   name: string;
   email: string;

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/auth/auth-context";
+import { roleLabels } from "@/lib/staff-setup";
 import { LogOut } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
@@ -42,7 +43,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="flex items-center gap-3 pl-2 border-l ml-2">
                   <div className="hidden flex-col items-end sm:flex">
                     <span className="text-sm font-medium leading-none">{user.name}</span>
-                    <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
+                    <span className="max-w-xs truncate text-xs text-muted-foreground">
+                      {user.setupRoles?.map((role) => roleLabels[role] ?? role).join(", ") ??
+                        user.role}
+                    </span>
                   </div>
                   <Avatar className="h-8 w-8 border">
                     <AvatarFallback className="bg-primary/10 text-xs text-primary">

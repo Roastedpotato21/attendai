@@ -1,4 +1,5 @@
 import "./lib/error-capture";
+import { handleStaffSetupInvitation } from "./lib/server/staff-setup";
 import { handleInstitutionVerificationEvidence } from "./lib/server/institution-verification";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
@@ -81,6 +82,9 @@ async function policyGate(request: Request): Promise<Response | null> {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if (new URL(request.url).pathname === "/api/institution-setup/staff-invitation") {
+        return handleStaffSetupInvitation(request);
+      }
       if (new URL(request.url).pathname === "/api/institution-verification/evidence") {
         return handleInstitutionVerificationEvidence(request);
       }
