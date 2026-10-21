@@ -521,7 +521,7 @@ async function setMode(mode) {
   await navigate(client, "/login");
   await waitForLoginForm(client);
   await submitLogin(client, mode + "@staff-fixture.invalid", "fixture-password");
-  await waitForPath(client, "/");
+  await waitForPath(client, "/dashboard");
   await waitFor(
     client,
     "document.body.innerText.includes('Your staff profile')",
@@ -536,6 +536,19 @@ try {
     source: "(" + installStaffFixture.toString() + ")();",
   });
   await setMode("owner");
+  await navigate(client, "/");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('.aw-portal'))",
+    "public opening for signed-in staff",
+  );
+  assert.equal(await client.evaluate("location.pathname"), "/");
+  await navigate(client, "/dashboard");
+  await waitFor(
+    client,
+    "document.body.innerText.includes('Institution Owner')",
+    "return to protected dashboard",
+  );
   assert.equal(
     await client.evaluate("document.body.innerText.includes('Institution Owner')"),
     true,
@@ -719,7 +732,7 @@ try {
     "/attendance",
   ]) {
     await navigate(client, path);
-    await waitForPath(client, "/");
+    await waitForPath(client, "/dashboard");
     await waitFor(
       client,
       "document.body.innerText.includes('Your staff profile')",
@@ -764,7 +777,7 @@ try {
   assert.equal(recoveryRequest.p_capability, "institution_owner");
   assert.equal(recoveryRequest.p_purpose, "ownership_recovery");
   assert.equal(recoveryRequest.p_details.institution_name, "Fictional Browser Institution");
-  await navigate(client, "/");
+  await navigate(client, "/dashboard");
   await waitFor(
     client,
     "document.body.innerText.includes('Your staff profile')",
@@ -782,7 +795,7 @@ try {
   await fill(client, "#confirm-password", "fixture-new-password");
   await client.evaluate("document.querySelectorAll('input[type=checkbox]').forEach(e=>e.click())");
   await client.evaluate("document.querySelector('button[type=submit]').click()");
-  await waitForPath(client, "/");
+  await waitForPath(client, "/dashboard");
   await waitFor(
     client,
     "document.body.innerText.includes('Your staff profile')",

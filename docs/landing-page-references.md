@@ -1,9 +1,14 @@
 # AttendAI public welcome page
 
-The public page lives at `/welcome`. The existing protected dashboard `/`, sign-in,
-signup, institution workflows and application pages retain their routes. Only the
-new public-route registration touches the shared route/auth shell. No API,
-database, migration, provider or delivery behavior changes in this pass.
+The public opening and landing page live at `/`; `/welcome` remains an alias.
+The existing protected dashboard now lives at `/dashboard`. Sign-in and institution
+registration use the same forest palette, local fonts and circuit artwork as the
+landing page, with responsive account layouts and links back home. Sign In opens
+`/login`; Get Started opens `/create-account`, where existing users can also sign
+in. Verified staff enter `/dashboard` after login, invitation acceptance, policy
+acceptance or approved verification. Pending applicants retain the institution
+verification gate. Sidebar links and denied-route fallbacks use `/dashboard`.
+No API, database, migration, provider or delivery behavior changes in this pass.
 
 ## References and reuse
 
@@ -117,7 +122,8 @@ headless Chrome debugging port:
     npm run build
     git diff --check
 
-The welcome suite intercepts external browser requests. It checks server-rendered
+The welcome suite intercepts external browser requests. It checks the public root
+does not redirect to login, themed login/signup at four widths, and server-rendered
 public content, font loading, glyph zoom/letter selection, live and paused wires,
 section reveals, anchors, native guide disclosure, keyboard controls, mobile menu,
 reduced motion, entry routes and retained anonymous protected-route redirects.

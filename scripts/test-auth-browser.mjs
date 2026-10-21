@@ -271,7 +271,7 @@ try {
   });
   await navigate(client, "/login");
   await client.evaluate("localStorage.clear();sessionStorage.clear()");
-  await navigate(client, "/");
+  await navigate(client, "/dashboard");
   await waitForPath(client, "/login");
   await waitForLoginForm(client);
   assert.deepEqual(
@@ -343,12 +343,27 @@ try {
   );
   await submitLogin(client, "applicant@fixture.invalid", "fixture-pending-password");
   await waitForPath(client, "/institution-verification");
+  await navigate(client, "/");
+  await waitFor(
+    client,
+    "Boolean(document.querySelector('.aw-portal'))",
+    "public opening for pending applicants",
+  );
+  assert.equal(await client.evaluate("location.pathname"), "/");
+  await navigate(client, "/institution-verification");
   await waitFor(
     client,
     "document.body.innerText.includes('Pending verification')",
     "pending status",
   );
-  for (const path of ["/", "/students", "/faculty", "/attendance", "/messages", "/voice-calls"]) {
+  for (const path of [
+    "/dashboard",
+    "/students",
+    "/faculty",
+    "/attendance",
+    "/messages",
+    "/voice-calls",
+  ]) {
     await navigate(client, path);
     await waitForPath(client, "/institution-verification");
     await waitFor(

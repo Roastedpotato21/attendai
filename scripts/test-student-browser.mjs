@@ -521,7 +521,7 @@ async function setMode(mode) {
   await navigate(client, "/login");
   await waitForLoginForm(client);
   await submitLogin(client, mode + "@staff-fixture.invalid", "fixture-password");
-  await waitForPath(client, "/");
+  await waitForPath(client, "/dashboard");
   await waitFor(
     client,
     "document.body.innerText.includes('Your staff profile')",
@@ -1240,7 +1240,7 @@ try {
     "unrelated faculty scoped directory",
   );
   await navigate(client, "/student-import");
-  await waitForPath(client, "/");
+  await waitForPath(client, "/dashboard");
   console.log(
     "Phase 3A/3B browser checks passed: student profile/history, guardian add and sibling reuse, separate consent, phone change review, preferences and retained ended links; student/guardian import previews and typed commits; cohort creation, graduation, promotion exceptions and unrelated faculty scope. All data is isolated browser fixtures.",
   );

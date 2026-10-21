@@ -51,7 +51,7 @@ const groups: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { title: "Dashboard", url: "/", icon: LayoutDashboard },
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
       { title: "My Staff Profile", url: "/staff-profile", icon: Users },
       { title: "My Attendance", url: "/student-dashboard", icon: LayoutDashboard },
       { title: "Attendance", url: "/attendance", icon: CalendarCheck },

@@ -521,7 +521,7 @@ async function setMode(mode) {
   await navigate(client, "/login");
   await waitForLoginForm(client);
   await submitLogin(client, mode + "@staff-fixture.invalid", "fixture-password");
-  await waitForPath(client, "/");
+  await waitForPath(client, "/dashboard");
   await waitFor(
     client,
     "document.body.innerText.includes('Your staff profile')",

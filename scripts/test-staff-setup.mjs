@@ -120,7 +120,7 @@ test("managed staff routes expose their workspace while management remains admin
   assert.equal(staffRouteAllowed("/staff-profile", true, false), true);
   assert.equal(staffRouteAllowed("/students", true, false), true);
   assert.equal(staffRouteAllowed("/student-promotion", true, false), true);
-  assert.equal(staffRouteAllowed("/", true, false), true);
+  assert.equal(staffRouteAllowed("/dashboard", true, false), true);
   assert.equal(staffRouteAllowed("/attendance", false, false), true);
 });
 test("invitation API rejects unauthenticated and unverified identities", async () => {

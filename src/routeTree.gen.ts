@@ -17,6 +17,7 @@ import { Route as AuditLogsRouteImport } from './routes/audit-logs'
 import { Route as CheckInRouteImport } from './routes/check-in'
 import { Route as CohortsRouteImport } from './routes/cohorts'
 import { Route as CreateAccountRouteImport } from './routes/create-account'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DepartmentsRouteImport } from './routes/departments'
 import { Route as EscalationsRouteImport } from './routes/escalations'
 import { Route as FacultyRouteImport } from './routes/faculty'
@@ -88,6 +89,11 @@ const CohortsRoute = CohortsRouteImport.update({
 const CreateAccountRoute = CreateAccountRouteImport.update({
   id: '/create-account',
   path: '/create-account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepartmentsRoute = DepartmentsRouteImport.update({
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/check-in': typeof CheckInRoute
   '/cohorts': typeof CohortsRoute
   '/create-account': typeof CreateAccountRoute
+  '/dashboard': typeof DashboardRoute
   '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
@@ -302,6 +309,7 @@ export interface FileRoutesByTo {
   '/check-in': typeof CheckInRoute
   '/cohorts': typeof CohortsRoute
   '/create-account': typeof CreateAccountRoute
+  '/dashboard': typeof DashboardRoute
   '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
@@ -345,6 +353,7 @@ export interface FileRoutesById {
   '/check-in': typeof CheckInRoute
   '/cohorts': typeof CohortsRoute
   '/create-account': typeof CreateAccountRoute
+  '/dashboard': typeof DashboardRoute
   '/departments': typeof DepartmentsRoute
   '/escalations': typeof EscalationsRoute
   '/faculty': typeof FacultyRoute
@@ -389,6 +398,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/cohorts'
     | '/create-account'
+    | '/dashboard'
     | '/departments'
     | '/escalations'
     | '/faculty'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/cohorts'
     | '/create-account'
+    | '/dashboard'
     | '/departments'
     | '/escalations'
     | '/faculty'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/check-in'
     | '/cohorts'
     | '/create-account'
+    | '/dashboard'
     | '/departments'
     | '/escalations'
     | '/faculty'
@@ -516,6 +528,7 @@ export interface RootRouteChildren {
   CheckInRoute: typeof CheckInRoute
   CohortsRoute: typeof CohortsRoute
   CreateAccountRoute: typeof CreateAccountRoute
+  DashboardRoute: typeof DashboardRoute
   DepartmentsRoute: typeof DepartmentsRoute
   EscalationsRoute: typeof EscalationsRoute
   FacultyRoute: typeof FacultyRoute
@@ -606,6 +619,13 @@ declare module '@tanstack/react-router' {
       path: '/create-account'
       fullPath: '/create-account'
       preLoaderRoute: typeof CreateAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/departments': {
@@ -844,6 +864,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckInRoute: CheckInRoute,
   CohortsRoute: CohortsRoute,
   CreateAccountRoute: CreateAccountRoute,
+  DashboardRoute: DashboardRoute,
   DepartmentsRoute: DepartmentsRoute,
   EscalationsRoute: EscalationsRoute,
   FacultyRoute: FacultyRoute,

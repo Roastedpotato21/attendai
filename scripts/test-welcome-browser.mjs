@@ -1,5 +1,6 @@
 /** Local public-page checks. External requests are intercepted; no production API calls. */
 import assert from "node:assert/strict";
+import { mkdir, writeFile } from "node:fs/promises";
 
 const base = new URL(process.argv[2] ?? "http://127.0.0.1:4195");
 assert.ok(["127.0.0.1", "localhost", "[::1]"].includes(base.hostname), "Use a local preview");
@@ -139,6 +140,13 @@ try {
     "Public content is server rendered",
   );
   await welcome();
+  await navigate("/");
+  await until(
+    `document.querySelector('.aw-portal')?.dataset.portalReady === 'true'`,
+    "root landing opening",
+  );
+  await sleep(200);
+  assert.equal(await client.evaluate("location.pathname"), "/", "Home stays public");
   assert.equal(
     await client.evaluate(`document.querySelector('[data-portal-art] text').textContent.trim()`),
     "AttendAI",
@@ -331,6 +339,10 @@ try {
     `location.pathname === '/create-account' && document.querySelector('input')`,
     "existing signup",
   );
+  assert.ok(
+    await client.evaluate(`!!document.querySelector('.aw-auth-signup')`),
+    "Signup uses the shared theme",
+  );
   await navigate("/welcome");
   await until(`document.querySelector('.aw-portal-signin')`, "opening sign-in link");
   await client.evaluate(`document.querySelector('.aw-portal-signin').click()`);
@@ -338,7 +350,43 @@ try {
     `location.pathname === '/login' && document.querySelector('#email')`,
     "existing login",
   );
-  for (const path of ["/", "/attendance"]) {
+  assert.ok(
+    await client.evaluate(`!!document.querySelector('.aw-auth')`),
+    "Sign-in uses the shared theme",
+  );
+  await mkdir(".tmp/entry-screenshots", { recursive: true });
+  for (const width of [320, 390, 768, 1440]) {
+    await client.call("Emulation.setDeviceMetricsOverride", {
+      width,
+      height: 1000,
+      deviceScaleFactor: 1,
+      mobile: width < 600,
+    });
+    for (const path of ["/login", "/create-account"]) {
+      await navigate(path);
+      await until(
+        `!!document.querySelector('.aw-auth') && !!document.querySelector('input')`,
+        "themed account page ready",
+      );
+      await sleep(200);
+      assert.ok(
+        await client.evaluate(`document.documentElement.scrollWidth <= innerWidth + 1`),
+        `${path} fits ${width}px`,
+      );
+      assert.equal(
+        await client.evaluate(
+          `getComputedStyle(document.querySelector('.aw-auth')).getPropertyValue('--primary').trim()`,
+        ),
+        "#2f5640",
+      );
+      const screenshot = await client.call("Page.captureScreenshot", { format: "png" });
+      await writeFile(
+        `.tmp/entry-screenshots/${path.slice(1)}-${width}.png`,
+        Buffer.from(screenshot.data, "base64"),
+      );
+    }
+  }
+  for (const path of ["/dashboard", "/attendance"]) {
     await client.call("Page.navigate", { url: new URL(path, base).href });
     await until(
       `location.pathname === '/login' && document.querySelector('#email')`,

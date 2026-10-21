@@ -75,7 +75,10 @@ function AcceptInvitePage() {
       await acceptPolicies("signup");
       const staff = await completeInvitation(password, staffInvitation);
       window.sessionStorage.removeItem("attendai:staff-invitation");
-      await router.navigate({ to: staff ? "/" : "/institution-verification", replace: true });
+      await router.navigate({
+        to: staff ? "/dashboard" : "/institution-verification",
+        replace: true,
+      });
     } catch (acceptError) {
       setError(acceptError instanceof Error ? acceptError.message : "Unable to accept invitation.");
     } finally {

@@ -98,7 +98,7 @@ export function InstitutionSetupPage({ section }: { section: SetupSection }) {
       <main className="p-6 space-y-3">
         <h1 className="text-xl font-semibold">Institution owner/admin access required</h1>
         <p>{error || "Staff cannot manage institution setup or claim membership."}</p>
-        <Link to="/">Go to your dashboard</Link>
+        <Link to="/dashboard">Go to your dashboard</Link>
       </main>
     );
   const props = model ? { id, catalog: model.catalog, profile: model.profile, busy, act } : null;

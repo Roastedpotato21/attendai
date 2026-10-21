@@ -5,13 +5,18 @@ import { InstitutionSearch } from "@/components/auth/institution-search";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { supabase } from "@/lib/db/connection";
 import { normalizeAuthEmail, signUpErrorMessage } from "@/lib/auth-errors";
 import type { RegistryMatch } from "@/lib/institution-verification";
+import { AuthPage, authPageHead } from "@/components/auth/auth-page";
 
 export const Route = createFileRoute("/create-account")({
-  head: () => ({ meta: [{ title: "Register an institution — AttendAI" }] }),
+  head: () =>
+    authPageHead(
+      "Register an institution",
+      "Create an applicant account and begin independent institution verification.",
+    ),
   component: CreateAccountPage,
 });
 function CreateAccountPage() {
@@ -86,11 +91,12 @@ function CreateAccountPage() {
     }
   }
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl items-center p-4">
-      <Card className="w-full">
+    <AuthPage signup>
+      <Card className="aw-auth-card">
         <CardHeader>
-          <CardTitle>Register your institution</CardTitle>
-          <CardDescription>
+          <p className="aw-kicker">GET STARTED</p>
+          <h1 id="auth-title">Register your institution</h1>
+          <CardDescription className="aw-auth-description">
             Institution existence and your authority to represent it are verified separately.
             Submitting an application does not grant institution access.
           </CardDescription>
@@ -103,7 +109,7 @@ function CreateAccountPage() {
                 an existing institution.
               </p>
               <Button asChild>
-                <Link to="/">Go to dashboard</Link>
+                <Link to="/dashboard">Go to dashboard</Link>
               </Button>
             </>
           ) : verificationAccess ? (
@@ -236,12 +242,12 @@ function CreateAccountPage() {
                   {error}
                 </p>
               )}
-              <Button type="submit" disabled={busy}>
+              <Button type="submit" className="aw-auth-submit" disabled={busy}>
                 {busy ? "Creating account identity…" : "Create applicant account"}
               </Button>
             </form>
           )}
-          <p className="text-sm">
+          <p className="aw-auth-switch">
             Already registered?{" "}
             <Link to="/login" search={{ redirect: undefined }} className="underline">
               Sign in
@@ -249,6 +255,6 @@ function CreateAccountPage() {
           </p>
         </CardContent>
       </Card>
-    </main>
+    </AuthPage>
   );
 }

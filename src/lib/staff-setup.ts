@@ -206,7 +206,7 @@ export function staffRouteAllowed(
   if (canManage) return true;
   if (legacyClasses && ["/attendance", "/students"].includes(path)) return true;
   return (
-    path === "/" ||
+    path === "/dashboard" ||
     path === "/staff-profile" ||
     path === "/students" ||
     path === "/student-promotion" ||

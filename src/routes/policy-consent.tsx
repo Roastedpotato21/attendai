@@ -44,7 +44,7 @@ function PolicyConsent() {
     setError("");
     try {
       await acceptPolicies("access_gate");
-      window.location.assign("/");
+      window.location.assign("/dashboard");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save acceptance.");
       setBusy(false);

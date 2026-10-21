@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { LogIn } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { AuthPage, authPageHead } from "@/components/auth/auth-page";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,9 +36,7 @@ export const Route = createFileRoute("/login")({
       redirect: search["redirect"] as string | undefined,
     };
   },
-  head: () => ({
-    meta: [{ title: "Login — AttendAI" }],
-  }),
+  head: () => authPageHead("Sign in", "Sign in to your verified AttendAI institution workspace."),
   component: LoginPage,
 });
 function LoginPage() {
@@ -61,7 +60,7 @@ function LoginPage() {
 
       // Validate but intentionally ignore deep links: staff always enter via the dashboard.
       void sanitizeRedirect(redirect);
-      await router.navigate({ to: staff ? "/" : "/institution-verification" });
+      await router.navigate({ to: staff ? "/dashboard" : "/institution-verification" });
     } catch (loginError: unknown) {
       setError(loginError instanceof Error ? loginError.message : "Failed to log in.");
     } finally {
@@ -89,19 +88,19 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center p-4 bg-muted/20">
-      <Card className="w-full max-w-md shadow-lg border-primary/20">
-        <CardHeader className="text-center pb-6">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <LogIn className="h-6 w-6" />
-          </div>
-          <CardTitle className="text-2xl font-display">AttendAI</CardTitle>
-          <CardDescription>Sign in to your staff account</CardDescription>
+    <AuthPage>
+      <Card className="aw-auth-card">
+        <CardHeader>
+          <p className="aw-kicker">WELCOME BACK</p>
+          <h1 id="auth-title">Your day starts here.</h1>
+          <CardDescription className="aw-auth-description">
+            Sign in to your institution account to continue your work or verification.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             {error && (
-              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
+              <div role="alert" className="aw-auth-error">
                 {error}
               </div>
             )}
@@ -113,7 +112,7 @@ function LoginPage() {
                 type="email"
                 autoComplete="email"
                 autoCapitalize="none"
-                placeholder="name@attendai.edu"
+                placeholder="Your email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -131,8 +130,9 @@ function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full mt-4" disabled={!!isLoggingIn}>
+            <Button type="submit" className="aw-auth-submit" disabled={!!isLoggingIn}>
               {isLoggingIn === "password" ? "Signing in..." : "Sign in"}
+              <ArrowUpRight size={16} aria-hidden="true" />
             </Button>
             <Button
               type="button"
@@ -143,10 +143,12 @@ function LoginPage() {
               Forgot password?
             </Button>
             {resetMessage && (
-              <p className="text-center text-sm text-muted-foreground">{resetMessage}</p>
+              <p role="status" className="aw-auth-reset">
+                {resetMessage}
+              </p>
             )}
           </form>
-          <div className="border-t pt-4 text-center text-sm text-muted-foreground">
+          <div className="aw-auth-switch">
             <p>New institution?</p>
             <Link
               to="/create-account"
@@ -154,17 +156,9 @@ function LoginPage() {
             >
               Create an administrator account
             </Link>
-            <p className="mt-4 flex justify-center gap-4 text-xs">
-              <Link to="/privacy" className="hover:underline">
-                Privacy Policy
-              </Link>
-              <Link to="/terms" className="hover:underline">
-                Terms & Conditions
-              </Link>
-            </p>
           </div>
         </CardContent>
       </Card>
-    </div>
+    </AuthPage>
   );
 }

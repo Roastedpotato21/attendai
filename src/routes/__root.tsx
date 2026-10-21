@@ -153,9 +153,13 @@ function AuthWrapper() {
   const router = useRouter();
   const pathname = router.state.location.pathname;
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
-  const isPublicContent = ["/welcome", "/privacy", "/terms", "/guardian-notifications"].includes(
-    pathname,
-  );
+  const isPublicContent = [
+    "/",
+    "/welcome",
+    "/privacy",
+    "/terms",
+    "/guardian-notifications",
+  ].includes(pathname);
   const [policyState, setPolicyState] = useState<"checking" | "accepted" | "required">("checking");
 
   useEffect(() => {
@@ -227,13 +231,13 @@ function AuthWrapper() {
         !!user.legacyClassAccess,
       )
     ) {
-      void router.navigate({ to: "/", replace: true });
+      void router.navigate({ to: "/dashboard", replace: true });
     } else if (user && pathname === "/login") {
       // Authenticated but on login page → redirect to home
-      void router.navigate({ to: "/", replace: true });
+      void router.navigate({ to: "/dashboard", replace: true });
     } else if (user && !isRouteAllowed(pathname, user.role)) {
       // Role not allowed for this route → redirect to home
-      void router.navigate({ to: "/", replace: true });
+      void router.navigate({ to: "/dashboard", replace: true });
     }
   }, [
     user,

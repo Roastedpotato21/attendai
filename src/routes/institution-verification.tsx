@@ -574,7 +574,7 @@ function InstitutionVerificationPage() {
                         This verification review was approved. Current ownership and staff access
                         follow the institution's recorded lifecycle and roles.
                       </p>
-                      <Button onClick={() => window.location.assign("/")}>
+                      <Button onClick={() => window.location.assign("/dashboard")}>
                         Continue to dashboard
                       </Button>
                     </>

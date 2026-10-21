@@ -24,6 +24,7 @@ export interface RouteAuthRule {
  */
 export const routeAuth: Record<string, RouteAuthRule> = {
   // Public routes (no auth required)
+  "/": { public: true },
   "/welcome": { public: true },
   "/login": { public: true },
   "/create-account": { public: true },
@@ -37,7 +38,7 @@ export const routeAuth: Record<string, RouteAuthRule> = {
   "/policy-consent": { public: true },
 
   // Overview
-  "/": { allowedRoles: ["admin", "faculty", "staff"] },
+  "/dashboard": { allowedRoles: ["admin", "faculty", "staff"] },
   "/student-dashboard": { allowedRoles: ["admin", "faculty", "staff"] },
   "/attendance": { allowedRoles: ["admin", "faculty"] },
   "/period-attendance": { allowedRoles: ["admin", "faculty", "staff"] },
