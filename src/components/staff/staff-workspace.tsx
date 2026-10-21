@@ -44,7 +44,7 @@ export function StaffWorkspacePage() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const staff = workspace.staff;
   return (
-    <main className="mx-auto max-w-6xl space-y-5 p-4">
+    <main className="dashboard-surface mx-auto max-w-6xl space-y-5 p-4">
       <header className="profile-greeting">
         <div className="profile-greeting-copy space-y-2">
           {workspace.institution.logo_data_url && (

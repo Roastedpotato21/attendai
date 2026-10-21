@@ -77,7 +77,7 @@ function StudentDashboard() {
   const isLowAttendance = data.overallPercentage !== null && data.overallPercentage < 75;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="dashboard-surface space-y-6 animate-in fade-in duration-500">
       <PageHeader title="My Attendance" description="View your attendance metrics and history." />
 
       {isLowAttendance && (

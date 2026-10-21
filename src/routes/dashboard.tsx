@@ -135,7 +135,7 @@ function LegacyDashboard() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px]">
+    <div className="dashboard-surface mx-auto max-w-[1400px]">
       <PageHeader
         title="Attendance dashboard"
         description="Here's what AttendAI handled across your campus today."
